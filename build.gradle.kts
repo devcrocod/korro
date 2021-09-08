@@ -9,7 +9,7 @@ plugins {
     `maven-publish`
 }
 
-group = "org.devcrocod"
+group = "me.devcrocod"
 version = detectVersion()
 
 fun detectVersion(): String {
@@ -76,8 +76,8 @@ extensions.getByType(PluginBundleExtension::class).apply {
 gradlePlugin {
     plugins {
         create("korro") {
-            id = "org.devcrocod.korro"
-            implementationClass = "org.devcrocod.korro.KorroPlugin"
+            id = "me.devcrocod.korro"
+            implementationClass = "me.devcrocod.korro.KorroPlugin"
             displayName = "Korro documentation plugin"
             description = "Inserts snippets code of Kotlin into markdown documents from source example files and tests."
         }
