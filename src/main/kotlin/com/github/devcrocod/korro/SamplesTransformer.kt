@@ -1,4 +1,4 @@
-package me.devcrocod.korro
+package com.github.devcrocod.korro
 
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
@@ -21,27 +21,13 @@ import org.jetbrains.kotlin.psi.psiUtil.prevLeaf
 import org.jetbrains.kotlin.psi.psiUtil.startOffset
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
-import org.jetbrains.kotlin.resolve.ImportPath
 import org.jetbrains.kotlin.utils.PathUtil
 import java.io.PrintWriter
 import java.io.StringWriter
+import kotlin.math.max
 import kotlin.math.min
 
 class SamplesTransformer(private val context: KorroContext) {
-
-    private val importsToIgnore =
-        arrayOf(
-            "samples.*",
-            "samples.Sample",
-            "kotlin.test.*",
-            "kotlin.test.Test",
-            "kotlin.test.assertEquals",
-            "kotlin.test.assertTrue",
-            "kotlin.test.assertFalse",
-            "kotlin.test.assertFails",
-            "kotlin.test.assertFailsWith",
-            "org.junit.Test"
-        ).map { ImportPath.fromString(it) }
 
     private class SampleBuilder : KtTreeVisitorVoid() {
         val builder = StringBuilder()
@@ -49,6 +35,8 @@ class SamplesTransformer(private val context: KorroContext) {
             get() = builder.toString()
 
         val errors = mutableListOf<ConvertError>()
+
+        var start: Boolean = false
 
         data class ConvertError(val e: Exception, val text: String, val loc: String)
 
@@ -150,8 +138,12 @@ class SamplesTransformer(private val context: KorroContext) {
         }
 
         override fun visitElement(element: PsiElement) {
-            if (element is LeafPsiElement)
-                builder.append(element.text)
+            if (element is LeafPsiElement) {
+                val t = element.text
+                if (t.trim() == "//SampleEnd") start = false
+                if (start) builder.append(t)
+                if (t.trim() == "//SampleStart") start = true
+            }
 
             element.acceptChildren(object : PsiElementVisitor() {
                 override fun visitElement(element: PsiElement) {
@@ -173,8 +165,7 @@ class SamplesTransformer(private val context: KorroContext) {
     private fun processBody(psiElement: PsiElement): String {
         val text = processSampleBody(psiElement).trim { it == '\n' || it == '\r' }.trimEnd()
         val lines = text.split("\n")
-        var indent = lines.filter(String::isNotBlank).map { it.takeWhile(Char::isWhitespace).count() }.minOrNull() ?: 0
-        indent = min(indent, 4)
+        val indent = lines.filter(String::isNotBlank).map { it.takeWhile(Char::isWhitespace).count() }.minOrNull() ?: 0
         return lines.joinToString("\n") { it.drop(indent) }
     }
 
@@ -203,7 +194,6 @@ class SamplesTransformer(private val context: KorroContext) {
 
     private fun fqNameToPsiElement(resolutionFacade: DokkaResolutionFacade?, functionName: String): PsiElement? {
         val packageName = functionName.takeWhile { it != '.' }
-        println(packageName)
         val descriptor = resolutionFacade?.resolveSession?.getPackageFragment(FqName(packageName))
             ?: return null.also { context.logger.warn("Cannot find descriptor for package $functionName") }
         val symbol = resolveKDocSampleLink(
@@ -211,7 +201,7 @@ class SamplesTransformer(private val context: KorroContext) {
             resolutionFacade,
             descriptor,
             functionName.split(".")
-        ).firstOrNull() ?: return null.also { context.logger.warn("Unresolved function $functionName in @sample") }
+        ).firstOrNull() ?: return null.also { context.logger.warn("Unresolved function $functionName") }
         return DescriptorToSourceUtils.descriptorToDeclaration(symbol)
     }
 

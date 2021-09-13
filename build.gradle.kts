@@ -5,11 +5,12 @@ plugins {
     kotlin("jvm")
     id("java")
     id("com.gradle.plugin-publish") version ("0.15.0")
+    id("com.github.johnrengelman.shadow") version "7.0.0"
     `java-gradle-plugin`
     `maven-publish`
 }
 
-group = "me.devcrocod"
+group = "com.github.devcrocod"
 version = detectVersion()
 
 fun detectVersion(): String {
@@ -32,12 +33,35 @@ repositories {
     gradlePluginPortal()
 }
 
-val dokkaVersion: String by project
+val dokka_version: String by project
+val kotlin_version: String by project
 dependencies {
+    shadow(kotlin("stdlib-jdk8", version = kotlin_version))
+    shadow("org.jetbrains.dokka:dokka-core:$dokka_version")
+
     compileOnly(gradleApi())
-    compileOnly("org.jetbrains.dokka:dokka-core:$dokkaVersion")
-    compileOnly("org.jetbrains.dokka:dokka-analysis:$dokkaVersion")
+    implementation("org.jetbrains.dokka:dokka-analysis:$dokka_version")
 }
+
+tasks {
+    shadowJar {
+        relocate("com.intellij", "com.github.devcrocod.com.intellij")
+        relocate("org.jetbrains.kotlin", "com.github.devcrocod.org.jetbrains.kotlin")
+        mergeServiceFiles()
+
+        archiveClassifier.set("")
+        dependencies {
+            exclude(dependency("org.jetbrains.kotlin:kotlin-stdlib"))
+            exclude(dependency("org.jetbrains.kotlin:kotlin-stdlib-jdk8"))
+            exclude(dependency("org.jetbrains.kotlin:kotlin-stdlib-jdk7"))
+            exclude(dependency("org.jetbrains.kotlin:kotlin-stdlib-common"))
+            exclude(dependency("org.jetbrains:annotations"))
+            exclude(dependency("org.jetbrains.dokka:dokka-core:$dokka_version"))
+        }
+    }
+}
+
+tasks.jar { enabled = false }
 
 val language_version: String by project
 tasks.withType(KotlinCompile::class).all {
@@ -51,13 +75,6 @@ tasks.withType(KotlinCompile::class).all {
         apiVersion = language_version
         jvmTarget = "1.8"
     }
-}
-
-
-apply {
-        plugin("org.jetbrains.kotlin.jvm")
-        plugin("java")
-        plugin("signing")
 }
 
 // Gradle metadata
@@ -76,10 +93,21 @@ extensions.getByType(PluginBundleExtension::class).apply {
 gradlePlugin {
     plugins {
         create("korro") {
-            id = "me.devcrocod.korro"
-            implementationClass = "me.devcrocod.korro.KorroPlugin"
+            id = "com.github.devcrocod.korro"
+            implementationClass = "com.github.devcrocod.korro.KorroPlugin"
             displayName = "Korro documentation plugin"
             description = "Inserts snippets code of Kotlin into markdown documents from source example files and tests."
+        }
+    }
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("pluginMaven") {
+            artifact(tasks["shadowJar"])
+        }
+        create<MavenPublication>("shadow") {
+            project.shadow.component(this)
         }
     }
 }

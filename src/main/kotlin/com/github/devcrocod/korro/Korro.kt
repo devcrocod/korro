@@ -1,4 +1,4 @@
-package me.devcrocod.korro
+package com.github.devcrocod.korro
 
 import java.io.File
 

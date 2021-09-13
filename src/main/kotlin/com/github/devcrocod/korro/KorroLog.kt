@@ -1,4 +1,4 @@
-package me.devcrocod.korro
+package com.github.devcrocod.korro
 
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
