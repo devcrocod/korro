@@ -140,9 +140,9 @@ class SamplesTransformer(private val context: KorroContext) {
         override fun visitElement(element: PsiElement) {
             if (element is LeafPsiElement) {
                 val t = element.text
-                if (t.trim() == "//SampleEnd") start = false
+                if (t.filterNot { it.isWhitespace() } == "//SampleEnd") start = false
                 if (start) builder.append(t)
-                if (t.trim() == "//SampleStart") start = true
+                if (t.filterNot { it.isWhitespace() } == "//SampleStart") start = true
             }
 
             element.acceptChildren(object : PsiElementVisitor() {
