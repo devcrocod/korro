@@ -1,4 +1,4 @@
-package com.github.devcrocod.korro
+package io.github.devcrocod.korro
 
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement

@@ -1,4 +1,4 @@
-package com.github.devcrocod.korro
+package io.github.devcrocod.korro
 
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException

@@ -10,7 +10,7 @@ plugins {
     `maven-publish`
 }
 
-group = "com.github.devcrocod"
+group = "io.github.devcrocod"
 version = detectVersion()
 
 fun detectVersion(): String {
@@ -45,8 +45,8 @@ dependencies {
 
 tasks {
     shadowJar {
-        relocate("com.intellij", "com.github.devcrocod.com.intellij")
-        relocate("org.jetbrains.kotlin", "com.github.devcrocod.org.jetbrains.kotlin")
+        relocate("com.intellij", "io.github.devcrocod.com.intellij")
+        relocate("org.jetbrains.kotlin", "io.github.devcrocod.org.jetbrains.kotlin")
         mergeServiceFiles()
 
         archiveClassifier.set("")
@@ -93,8 +93,8 @@ extensions.getByType(PluginBundleExtension::class).apply {
 gradlePlugin {
     plugins {
         create("korro") {
-            id = "com.github.devcrocod.korro"
-            implementationClass = "com.github.devcrocod.korro.KorroPlugin"
+            id = "io.github.devcrocod.korro"
+            implementationClass = "io.github.devcrocod.korro.KorroPlugin"
             displayName = "Korro documentation plugin"
             description = "Inserts snippets code of Kotlin into markdown documents from source example files and tests."
         }
