@@ -92,7 +92,7 @@ pluginBundle {
 }
 
 gradlePlugin {
-    isAutomatedPublishing = false
+//    isAutomatedPublishing = false
     plugins {
         create("korro") {
             id = "io.github.devcrocod.korro"
