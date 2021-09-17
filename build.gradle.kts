@@ -1,4 +1,3 @@
-import com.gradle.publish.PluginBundleExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
@@ -57,10 +56,7 @@ tasks {
     }
 }
 
-tasks.jar {
-    dependsOn("shadowJar")
-    enabled = false
-}
+tasks.jar { enabled = false }
 
 val language_version: String by project
 tasks.withType(KotlinCompile::class).all {
@@ -83,13 +79,20 @@ java {
     targetCompatibility = JavaVersion.VERSION_1_8
 }
 
-extensions.getByType(PluginBundleExtension::class).apply {
+tasks.whenTaskAdded {
+    if (name == "publishPluginJar" || name == "generateMetadataFileForPluginMavenPublication") {
+        dependsOn(tasks.named("shadowJar"))
+    }
+}
+
+pluginBundle {
     website = "https://github.com/devcrocod/korro"
-    vcsUrl = website
+    vcsUrl = "https://github.com/devcrocod/korro"
     tags = listOf("kotlin", "documentation", "markdown")
 }
 
 gradlePlugin {
+    isAutomatedPublishing = false
     plugins {
         create("korro") {
             id = "io.github.devcrocod.korro"
@@ -103,10 +106,8 @@ gradlePlugin {
 publishing {
     publications {
         create<MavenPublication>("pluginMaven") {
-            artifact(tasks["shadowJar"])
-        }
-        create<MavenPublication>("shadow") {
-            project.shadow.component(this)
+            shadow.component(this)
+//            artifact(tasks["shadowJar"])
         }
     }
 }
