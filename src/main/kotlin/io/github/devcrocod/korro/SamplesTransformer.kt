@@ -24,8 +24,6 @@ import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
 import org.jetbrains.kotlin.utils.PathUtil
 import java.io.PrintWriter
 import java.io.StringWriter
-import kotlin.math.max
-import kotlin.math.min
 
 class SamplesTransformer(private val context: KorroContext) {
 

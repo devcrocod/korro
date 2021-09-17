@@ -57,7 +57,10 @@ tasks {
     }
 }
 
-tasks.jar { enabled = false }
+tasks.jar {
+    dependsOn("shadowJar")
+    enabled = false
+}
 
 val language_version: String by project
 tasks.withType(KotlinCompile::class).all {

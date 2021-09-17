@@ -10,7 +10,7 @@ This plugin produces code snippets into markdown documents from tests.
 ## Setup
 ```groovy
 plugins {
-    id("com.github.devcrocod.korro") version "0.0.7"
+    id("io.github.devcrocod.korro") version "0.0.3"
 }
 ```
 
@@ -19,7 +19,7 @@ or
 ```groovy
 buildscript {
     dependencies {
-        classpath "io.github.devcrocod:korro:0.0.7"
+        classpath "io.github.devcrocod:korro:0.0.3"
     }
 }
                     
@@ -75,7 +75,7 @@ _**Note**_:
 `build.gradle`
 ```groovy
 plugins {
-    id("com.github.devcrocod.korro") version "0.0.7"
+    id("io.github.devcrocod.korro") version "0.0.3"
 }
 
 ...
