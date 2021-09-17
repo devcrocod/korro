@@ -16,11 +16,7 @@ version = detectVersion()
 fun detectVersion(): String {
     val buildNumber = rootProject.findProperty("build.number") as String?
     return if (buildNumber != null) {
-        if (hasProperty("build.number.detection")) {
-            "$version-dev-$buildNumber"
-        } else {
-            buildNumber
-        }
+        "$version-dev-$buildNumber"
     } else if (hasProperty("release")) {
         version as String
     } else {
