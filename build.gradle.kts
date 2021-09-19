@@ -2,10 +2,10 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     kotlin("jvm")
-    id("com.gradle.plugin-publish") version ("0.15.0")
-    id("com.github.johnrengelman.shadow") version "7.0.0"
     `java-gradle-plugin`
+    id("com.gradle.plugin-publish") version ("0.15.0")
     `maven-publish`
+    id("com.github.johnrengelman.shadow") version "7.0.0"
 }
 
 group = "io.github.devcrocod"
@@ -26,11 +26,7 @@ configurations.named(JavaPlugin.API_CONFIGURATION_NAME) {
     dependencies.remove(project.dependencies.gradleApi())
 }
 
-gradlePlugin {
-    isAutomatedPublishing = false
-}
-
-apply(from = file("gradle/publish.gradle"))
+//apply(from = file("gradle/publish.gradle"))
 
 repositories {
     mavenCentral()
@@ -65,7 +61,16 @@ tasks {
     }
 }
 
-tasks.jar { enabled = false }
+tasks.jar {
+    enabled = false
+    dependsOn("shadowJar")
+    manifest {
+        attributes(
+            "Implementation-Title" to "$archiveBaseName",
+            "Implementation-Version" to "$archiveVersion"
+        )
+    }
+}
 
 val language_version: String by project
 tasks.withType(KotlinCompile::class).all {
@@ -94,23 +99,23 @@ tasks.withType(KotlinCompile::class).all {
 //    }
 //}
 
-//pluginBundle {
-//    website = "https://github.com/devcrocod/korro"
-//    vcsUrl = "https://github.com/devcrocod/korro"
-//    tags = listOf("kotlin", "documentation", "markdown")
-//}
-
-//gradlePlugin {
-//    isAutomatedPublishing = false
-//    plugins {
-//        create("korro") {
-//            id = "io.github.devcrocod.korro"
-//            implementationClass = "io.github.devcrocod.korro.KorroPlugin"
-//            displayName = "Korro documentation plugin"
+gradlePlugin {
+    plugins {
+        create("korro") {
+            id = "io.github.devcrocod.korro"
+            implementationClass = "io.github.devcrocod.korro.KorroPlugin"
+            displayName = "Korro documentation plugin"
 //            description = "Inserts snippets code of Kotlin into markdown documents from source example files and tests."
-//        }
-//    }
-//}
+        }
+    }
+}
+
+pluginBundle {
+    website = "https://github.com/devcrocod/korro"
+    vcsUrl = "https://github.com/devcrocod/korro"
+    description = "Inserts snippets code of Kotlin into markdown documents from source example files and tests."
+    tags = listOf("kotlin", "documentation", "markdown")
+}
 
 //publishing {
 //    publications {
