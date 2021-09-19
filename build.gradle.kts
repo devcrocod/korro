@@ -26,8 +26,6 @@ configurations.named(JavaPlugin.API_CONFIGURATION_NAME) {
     dependencies.remove(project.dependencies.gradleApi())
 }
 
-//apply(from = file("gradle/publish.gradle"))
-
 repositories {
     mavenCentral()
     gradlePluginPortal()
@@ -86,19 +84,6 @@ tasks.withType(KotlinCompile::class).all {
     }
 }
 
-// Gradle metadata
-//java {
-//    withSourcesJar()
-//    withJavadocJar()
-//    targetCompatibility = JavaVersion.VERSION_1_8
-//}
-
-//tasks.whenTaskAdded {
-//    if (name == "publishPluginJar" || name == "generateMetadataFileForPluginMavenPublication") {
-//        dependsOn(tasks.named("shadowJar"))
-//    }
-//}
-
 gradlePlugin {
     plugins {
         create("korro") {
@@ -116,12 +101,3 @@ pluginBundle {
     description = "Inserts snippets code of Kotlin into markdown documents from source example files and tests."
     tags = listOf("kotlin", "documentation", "markdown")
 }
-
-//publishing {
-//    publications {
-//        create<MavenPublication>("pluginMaven") {
-//            shadow.component(this)
-////            artifact(tasks["shadowJar"])
-//        }
-//    }
-//}
