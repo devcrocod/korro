@@ -1,11 +1,25 @@
 # Korro
 [![Apache license](https://img.shields.io/badge/license-Apache%20License%202.0-blue.svg?style=flat)](https://www.apache.org/licenses/LICENSE-2.0)
+[![Gradle plugin](https://img.shields.io/maven-metadata/v/https/plugins.gradle.org/m2/io/github/devcrocod/korro/maven-metadata.xml.svg?label=Gradle+plugin)]
 
 Kotlin source code documentation plugin.
 
 Inspired by [kotlinx-knit](https://github.com/Kotlin/kotlinx-knit).
 
 This plugin produces code snippets into markdown documents from tests.
+
+<!---TOC-->
+* [Setup](#setup)
+    * [Tasks](#tasks)
+    * [Parameters](#parameters)
+* [Docs](#docs)
+  * [Directives](#directives)
+    * [IMPORT](#import)
+    * [FUN](#fun)
+    * [FUNS](#funs)
+    * [END](#end)
+* [Sample](#sample)
+<!---END-->
 
 ## Setup
 ```groovy
@@ -29,6 +43,8 @@ apply plugin: 'io.github.devcrocod.korro'
 ### Tasks
 
 * `korro` - create/update samples in documentation
+* `korroClean` - remove inserted code snippets in documentation.
+Removes everything between the `FUN`/`END` and `FUNS`/`END` directives.
 * `korroCheck` - TODO
 * `korroTest` - TODO
 
@@ -47,13 +63,47 @@ korro {
 ```
 
 ## Docs
+### Directives
 
-Directives are used to insert code into the documentation:
+Korro does not parse the document and only recognizes _directives_.
+Directives must always start at the beginning of a line, start with
 ```
-<!--- fully qualified name -->
+<!---
+```
+and end with
+
+```
+-->
+```
+There are also two types of directives that require and don't require the `END` closing directive.
+
+#### IMPORT
+The `IMPORT` directive is used to import a class containing test functions.
+```
+<!---IMPORT org.example.Test-->
+```
+Multiple imports can be specified in the documentation file.
+
+_**Note**_:
+
+_Import will not include the entire package, that is, such a path is not recognized - `org.example.*`._
+
+_You can specify the same classes._
+```
+<!---IMPORT org.example.test.Test-->
+<!---IMPORT org.example.test2.Test-->
+```
+
+_If two classes contain the same function names, then the function will be taken from the first imported class._
+
+#### FUN
+
+FUN directive is used to insert code into documentation:
+```
+<!---FUN fully qualified name -->
 <!---END-->
 ```
-Сode will be inserted between these two directives.
+Code will be inserted between these two directives.
 
 Only the part between the two comments `// SampleStart`, `// SampleEnd` will be taken from the test function:
 ```kotlin
@@ -66,9 +116,15 @@ fun test() {
 }
 ```
 
-_**Note**_: 
-* Do not use function names with spaces enclosed in backticks
-* Directives must always start at the beginning of the line.
+_**Note**_:
+
+_Do not use function names with spaces enclosed in backticks_
+
+#### FUNS
+
+#### END
+
+The `END` directive is the closing directive for `FUN` and `FUNS`.
 
 ## Sample
 
@@ -116,11 +172,12 @@ class Test {
 `doc.md`
 ```
 # Docs
+<!---IMPORT samples.Test-->
 
 Some text.
 
 Example:
-<!---samples.Test.exampleTest-->
+<!---FUN exampleTest-->
 <!---END-->
 
 Some text.
@@ -130,11 +187,12 @@ Some text.
 After you run `korro` you get the following file `doc.md`:
 ```
 # Docs
+<!---IMPORT samples.Test-->
 
 Some text.
 
 Example:
-<!---samples.Test.exampleTest-->
+<!---FUN exampleTest-->
 ```kotlin
 c = a + b
 ``'

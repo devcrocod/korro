@@ -90,7 +90,7 @@ gradlePlugin {
             id = "io.github.devcrocod.korro"
             implementationClass = "io.github.devcrocod.korro.KorroPlugin"
             displayName = "Korro documentation plugin"
-//            description = "Inserts snippets code of Kotlin into markdown documents from source example files and tests."
+            description = "Inserts snippets code of Kotlin into markdown documents from source example files and tests."
         }
     }
 }
@@ -98,6 +98,5 @@ gradlePlugin {
 pluginBundle {
     website = "https://github.com/devcrocod/korro"
     vcsUrl = "https://github.com/devcrocod/korro"
-    description = "Inserts snippets code of Kotlin into markdown documents from source example files and tests."
     tags = listOf("kotlin", "documentation", "markdown")
 }

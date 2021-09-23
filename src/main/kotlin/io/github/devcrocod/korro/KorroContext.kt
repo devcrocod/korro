@@ -19,3 +19,10 @@ fun KorroContext.process(): Boolean {
     }
     return true
 }
+
+fun KorroContext.processClean(): Boolean {
+    while (!fileQueue.isEmpty()) {
+        if (!korroClean(fileQueue.removeFirst())) return false
+    }
+    return true
+}

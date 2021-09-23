@@ -169,7 +169,7 @@ class SamplesTransformer(private val context: KorroContext) {
 
     operator fun invoke(functionName: String): String? {
         val facade = setUpAnalysis().facade
-        val psiElement = fqNameToPsiElement(facade, functionName) ?: return null.also { context.logger.warn("Cannot find PsiElement corresponding to $functionName") }
+        val psiElement = fqNameToPsiElement(facade, functionName) ?: return null//.also { context.logger.warn("Cannot find PsiElement corresponding to $functionName") }
         val body = processBody(psiElement)
         return createSampleBody(body)
     }
@@ -193,13 +193,13 @@ class SamplesTransformer(private val context: KorroContext) {
     private fun fqNameToPsiElement(resolutionFacade: DokkaResolutionFacade?, functionName: String): PsiElement? {
         val packageName = functionName.takeWhile { it != '.' }
         val descriptor = resolutionFacade?.resolveSession?.getPackageFragment(FqName(packageName))
-            ?: return null.also { context.logger.warn("Cannot find descriptor for package $functionName") }
+            ?: return null.also { context.logger.debug("Cannot find descriptor for package $functionName") } // todo
         val symbol = resolveKDocSampleLink(
             BindingContext.EMPTY,
             resolutionFacade,
             descriptor,
             functionName.split(".")
-        ).firstOrNull() ?: return null.also { context.logger.warn("Unresolved function $functionName") }
+        ).firstOrNull() ?: return null.also { context.logger.debug("Unresolved function $functionName") }
         return DescriptorToSourceUtils.descriptorToDeclaration(symbol)
     }
 

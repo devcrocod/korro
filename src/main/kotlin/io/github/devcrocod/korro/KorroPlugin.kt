@@ -11,6 +11,11 @@ class KorroPlugin : Plugin<Project> {
                 it.description = "Runs Korro Tool"
                 it.group = "documentation"
             }
+
+            tasks.register("korroClean", KorroCleanTask::class.java) {
+                it.description = "Deletes inserted samples"
+                it.group = "documentation"
+            }
         }
     }
 }
