@@ -29,7 +29,8 @@ fun KorroContext.korro(inputFile: File): Boolean {
             lines.add(line)
             val directive = parseDirective(line)
             when (directive?.name) {
-                null, END_DIRECTIVE -> {}
+                null, END_DIRECTIVE -> {
+                }
                 IMPORT_DIRECTIVE -> {
                     imports.add(directive.value + ".")
                 }
@@ -46,8 +47,20 @@ fun KorroContext.korro(inputFile: File): Boolean {
                     val functionNames = imports.map {
                         it + directive.value
                     }
-                    val newSamplesLines = functionNames.firstNotNullResult { // TODO: can be improved
-                        samplesTransformer(it)?.split("\n")?.plus(oldSampleLines.last()) //?: oldSampleLines
+                    val newSamplesLines = functionNames.firstNotNullResult { name -> // TODO: can be improved
+                        val text = samplesTransformer(name) ?: groups.firstNotNullResult { group ->
+                            group.patterns.mapNotNull { pattern ->
+                                samplesTransformer(name + pattern.nameSuffix)?.let {
+                                    group.beforeSample?.let { pattern.processSubstitutions(it) } + it +
+                                            group.afterSample?.let { pattern.processSubstitutions(it) }
+                                }
+                            }.takeIf { it.isNotEmpty() }?.joinToString(
+                                separator = "\n",
+                                prefix = group.beforeGroup ?: "",
+                                postfix = group.afterGroup ?: ""
+                            )
+                        }
+                        text?.split("\n")?.plus(oldSampleLines.last()) //?: oldSampleLines
                     }
                     if (newSamplesLines == null) {
                         logger.warn("Cannot find PsiElement corresponding to '${directive.value}'")
@@ -60,7 +73,8 @@ fun KorroContext.korro(inputFile: File): Boolean {
                         lines.addAll(oldSampleLines)
                     }
                 }
-                FUNS_DIRECTIVE -> {}
+                FUNS_DIRECTIVE -> {
+                }
                 else -> logger.warn("Unrecognized directive '${directive.name}' on a line starting with '$DIRECTIVE_START' in '$inputFile'")
             }
         }
@@ -105,8 +119,10 @@ fun KorroContext.korroClean(inputFile: File): Boolean {
                         lines.add(oldSampleLines.first())
                     }
                 }
-                FUNS_DIRECTIVE -> {}
-                else -> {}
+                FUNS_DIRECTIVE -> {
+                }
+                else -> {
+                }
             }
         }
     }

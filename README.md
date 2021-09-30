@@ -62,6 +62,26 @@ korro {
 }
 ```
 
+To insert several samples by single reference in markdown use `groupSamples`. For example, to wrap samples that have the same function name prefix followed by `_v1` or `_v2` within HTML tabs use the following configuration:
+```groovy
+korro {
+  groupSamples {
+
+    beforeSample = "<tab title=\"NAME\">\n"
+    afterSample = "\n</tab>"
+
+    funSuffix("_v1") {
+      replaceText("NAME", "Version 1")
+    }
+    funSuffix("_v2") {
+      replaceText("NAME", "Version 2")
+    }
+    beforeGroup = "<tabs>\n"
+    afterGroup = "</tabs>"
+  }
+}
+```
+
 ## Docs
 ### Directives
 

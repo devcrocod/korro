@@ -6,7 +6,8 @@ import java.util.*
 class KorroContext(
     val logger: KorroLog,
     docs: Collection<File>,
-    samples: Collection<File>
+    samples: Collection<File>,
+    val groups: List<SamplesGroup>
 ) {
     // state
     val fileQueue = ArrayDeque(docs)
