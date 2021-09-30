@@ -9,6 +9,9 @@ const val IMPORT_DIRECTIVE = "IMPORT"
 const val FUN_DIRECTIVE = "FUN"
 const val FUNS_DIRECTIVE = "FUNS"
 const val END_DIRECTIVE = "END"
+const val EOF = "\u001a"
+
+const val END_SAMPLE = DIRECTIVE_START + END_DIRECTIVE + DIRECTIVE_END
 
 val DIRECTIVE_REGEX =
     Regex("$DIRECTIVE_START\\s*([_a-zA-Z.]+)(?:\\s+(.+?(?=$DIRECTIVE_END|)))?(?:\\s*($DIRECTIVE_END))?\\s*")
@@ -23,11 +26,43 @@ fun KorroContext.korro(inputFile: File): Boolean {
     val lines = ArrayList<String>()
     val imports = mutableListOf("")
     var rewrite = false
+
+    fun processFun(funName: String, oldSampleLines: List<String>) {
+        val functionNames = imports.map {
+            it + funName
+        }
+        val newSamplesLines = functionNames.firstNotNullResult { name -> // TODO: can be improved
+            val text = samplesTransformer(name) ?: groups.firstNotNullResult { group ->
+                group.patterns.mapNotNull { pattern ->
+                    samplesTransformer(name + pattern.nameSuffix)?.let {
+                        group.beforeSample?.let { pattern.processSubstitutions(it) } + it +
+                                group.afterSample?.let { pattern.processSubstitutions(it) }
+                    }
+                }.takeIf { it.isNotEmpty() }?.joinToString(
+                    separator = "\n",
+                    prefix = group.beforeGroup ?: "",
+                    postfix = group.afterGroup ?: ""
+                )
+            }
+            text?.split("\n")?.plus(END_SAMPLE) //?: oldSampleLines
+        }
+        if (newSamplesLines == null) {
+            logger.warn("Cannot find PsiElement corresponding to '$funName'")
+        }
+        if (newSamplesLines != null && oldSampleLines != newSamplesLines) {
+            rewrite = true
+            logger.info("*** Add $funName sample")
+            lines.addAll(newSamplesLines)
+        } else {
+            lines.addAll(oldSampleLines)
+        }
+    }
+
     inputFile.bufferedReader().use { bufferedReader ->
         while (true) {
             val line = bufferedReader.readLine() ?: break
             lines.add(line)
-            val directive = parseDirective(line)
+            var directive = parseDirective(line)
             when (directive?.name) {
                 null, END_DIRECTIVE -> {
                 }
@@ -37,41 +72,33 @@ fun KorroContext.korro(inputFile: File): Boolean {
                 FUN_DIRECTIVE -> {
                     val oldSampleLines = ArrayList<String>()
                     while (true) {
-                        val sampleLine = bufferedReader.readLine() ?: error("Unexpected end of file after '$line'")
-                        if (parseDirective(sampleLine)?.name == END_DIRECTIVE) {
-                            oldSampleLines.add(sampleLine)
-                            break
-                        }
-                        oldSampleLines.add(sampleLine)
-                    }
-                    val functionNames = imports.map {
-                        it + directive.value
-                    }
-                    val newSamplesLines = functionNames.firstNotNullResult { name -> // TODO: can be improved
-                        val text = samplesTransformer(name) ?: groups.firstNotNullResult { group ->
-                            group.patterns.mapNotNull { pattern ->
-                                samplesTransformer(name + pattern.nameSuffix)?.let {
-                                    group.beforeSample?.let { pattern.processSubstitutions(it) } + it +
-                                            group.afterSample?.let { pattern.processSubstitutions(it) }
+                        val sampleLine = bufferedReader.readLine()
+                        val nextDirective = if(sampleLine != null) parseDirective(sampleLine) else Directive(EOF, "")
+                        when(nextDirective?.name){
+                            END_DIRECTIVE -> {
+                                oldSampleLines.add(sampleLine)
+                                break
+                            }
+                            EOF, FUN_DIRECTIVE -> {
+                                processFun(directive!!.value, emptyList())
+                                lines.addAll(oldSampleLines)
+                                oldSampleLines.clear()
+                                if(sampleLine == null) // eof
+                                {
+                                    directive = null
+                                    break
                                 }
-                            }.takeIf { it.isNotEmpty() }?.joinToString(
-                                separator = "\n",
-                                prefix = group.beforeGroup ?: "",
-                                postfix = group.afterGroup ?: ""
-                            )
+                                directive = nextDirective
+                                lines.add(sampleLine)
+                            }
+                            else -> {
+                                oldSampleLines.add(sampleLine)
+                            }
                         }
-                        text?.split("\n")?.plus(oldSampleLines.last()) //?: oldSampleLines
                     }
-                    if (newSamplesLines == null) {
-                        logger.warn("Cannot find PsiElement corresponding to '${directive.value}'")
-                    }
-                    if (newSamplesLines != null && oldSampleLines != newSamplesLines) {
-                        rewrite = true
-                        logger.info("*** Add ${directive.value} sample")
-                        lines.addAll(newSamplesLines)
-                    } else {
-                        lines.addAll(oldSampleLines)
-                    }
+                    if(directive == null) // eof
+                        break
+                    processFun(directive.value, oldSampleLines)
                 }
                 FUNS_DIRECTIVE -> {
                 }
@@ -99,24 +126,34 @@ fun KorroContext.korroClean(inputFile: File): Boolean {
         while (true) {
             val line = bufferedReader.readLine() ?: break
             lines.add(line)
-            val directive = parseDirective(line)
+            var directive = parseDirective(line)
             when (directive?.name) {
                 FUN_DIRECTIVE -> {
                     val oldSampleLines = ArrayList<String>()
                     while (true) {
-                        val sampleLine = bufferedReader.readLine() ?: error("Unexpected end of file after '$line'")
-                        if (parseDirective(sampleLine)?.name == END_DIRECTIVE) {
-                            oldSampleLines.add(sampleLine)
-                            break
+                        val sampleLine = bufferedReader.readLine()
+                        val nextDir = if(sampleLine != null) parseDirective(sampleLine) else Directive(EOF, "")
+                        when(nextDir?.name) {
+                            END_DIRECTIVE -> {
+                                oldSampleLines.add(sampleLine)
+                                break
+                            }
+                            EOF, FUN_DIRECTIVE -> {
+                                lines.addAll(oldSampleLines)
+                                oldSampleLines.clear()
+                                if(sampleLine == null)
+                                    break
+                                lines.add(sampleLine)
+                                directive = nextDir
+                            }
+                            else -> {
+                                oldSampleLines.add(sampleLine)
+                            }
                         }
-                        oldSampleLines.add(sampleLine)
                     }
-                    if (oldSampleLines.isNotEmpty() && oldSampleLines.size > 1) {
+                    if (oldSampleLines.isNotEmpty()) {
                         rewrite = true
-                        logger.info("*** Clean ${directive.value} sample")
-                        lines.add(oldSampleLines.last())
-                    } else {
-                        lines.add(oldSampleLines.first())
+                        logger.info("*** Clean ${directive?.value} sample")
                     }
                 }
                 FUNS_DIRECTIVE -> {
