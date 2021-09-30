@@ -186,9 +186,11 @@ class SamplesTransformer(private val context: KorroContext) {
         }
 
     private fun createSampleBody(body: String) =
-        """ |```kotlin
+        """ |
+            |```kotlin
             |$body
-            |```""".trimMargin()
+            |```
+            |""".trimMargin()
 
     private fun fqNameToPsiElement(resolutionFacade: DokkaResolutionFacade?, functionName: String): PsiElement? {
         val packageName = functionName.takeWhile { it != '.' }
