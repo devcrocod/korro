@@ -3,9 +3,9 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
     kotlin("jvm")
     `java-gradle-plugin`
-    id("com.gradle.plugin-publish") version ("0.15.0")
+    id("com.gradle.plugin-publish") version ("1.0.0")
     `maven-publish`
-    id("com.github.johnrengelman.shadow") version "7.0.0"
+    id("com.github.johnrengelman.shadow") version "7.1.2"
 }
 
 group = "io.github.devcrocod"
@@ -84,18 +84,15 @@ tasks.withType(KotlinCompile::class).all {
 }
 
 gradlePlugin {
+    website.set("https://github.com/devcrocod/korro")
+    vcsUrl.set("https://github.com/devcrocod/korro")
     plugins {
         create("korro") {
             id = "io.github.devcrocod.korro"
             implementationClass = "io.github.devcrocod.korro.KorroPlugin"
             displayName = "Korro documentation plugin"
             description = "Inserts snippets code of Kotlin into markdown documents from source example files and tests."
+            tags.set(listOf("kotlin", "documentation", "markdown"))
         }
     }
-}
-
-pluginBundle {
-    website = "https://github.com/devcrocod/korro"
-    vcsUrl = "https://github.com/devcrocod/korro"
-    tags = listOf("kotlin", "documentation", "markdown")
 }
