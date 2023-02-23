@@ -31,8 +31,8 @@ fun KorroContext.korro(inputFile: File): Boolean {
         val functionNames = imports.map {
             it + funName
         }
-        val newSamplesLines = functionNames.firstNotNullResult { name -> // TODO: can be improved
-            val text = samplesTransformer(name) ?: groups.firstNotNullResult { group ->
+        val newSamplesLines = functionNames.firstNotNullOfOrNull { name -> // TODO: can be improved
+            val text = samplesTransformer(name) ?: groups.firstNotNullOfOrNull { group ->
                 group.patterns.mapNotNull { pattern ->
                     samplesTransformer(name + pattern.nameSuffix)?.let {
                         group.beforeSample?.let { pattern.processSubstitutions(it) } + it +

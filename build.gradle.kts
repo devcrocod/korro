@@ -74,7 +74,7 @@ val language_version: String by project
 tasks.withType(KotlinCompile::class).all {
     kotlinOptions {
         freeCompilerArgs = freeCompilerArgs + listOf(
-            "-Xopt-in=kotlin.RequiresOptIn",
+            "-opt-in=kotlin.RequiresOptIn",
             "-Xskip-metadata-version-check",
             "-Xjsr305=strict"
         )

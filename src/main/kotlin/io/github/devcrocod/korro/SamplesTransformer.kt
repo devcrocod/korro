@@ -14,7 +14,7 @@ import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSourceLocation
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.common.messages.MessageRenderer
-import org.jetbrains.kotlin.idea.kdoc.resolveKDocSampleLink
+import org.jetbrains.kotlin.idea.kdoc.resolveKDocLink
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.prevLeaf
@@ -169,7 +169,8 @@ class SamplesTransformer(private val context: KorroContext) {
 
     operator fun invoke(functionName: String): String? {
         val facade = setUpAnalysis().facade
-        val psiElement = fqNameToPsiElement(facade, functionName) ?: return null//.also { context.logger.warn("Cannot find PsiElement corresponding to $functionName") }
+        val psiElement = fqNameToPsiElement(facade, functionName)
+            ?: return null//.also { context.logger.warn("Cannot find PsiElement corresponding to $functionName") }
         val body = processBody(psiElement)
         return createSampleBody(body)
     }
@@ -196,10 +197,11 @@ class SamplesTransformer(private val context: KorroContext) {
         val packageName = functionName.takeWhile { it != '.' }
         val descriptor = resolutionFacade?.resolveSession?.getPackageFragment(FqName(packageName))
             ?: return null.also { context.logger.debug("Cannot find descriptor for package $functionName") } // todo
-        val symbol = resolveKDocSampleLink(
+        val symbol = resolveKDocLink(
             BindingContext.EMPTY,
             resolutionFacade,
             descriptor,
+            null,
             functionName.split(".")
         ).firstOrNull() ?: return null.also { context.logger.debug("Unresolved function $functionName") }
         return DescriptorToSourceUtils.descriptorToDeclaration(symbol)
@@ -214,6 +216,7 @@ class SamplesTransformer(private val context: KorroContext) {
                 else -> bodyExpressionText
             }
         }
+
         else -> psiElement.buildSampleText()
     }
 
