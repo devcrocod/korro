@@ -80,7 +80,6 @@ tasks.withType(KotlinCompile::class).all {
         )
         languageVersion = language_version
         apiVersion = language_version
-        jvmTarget = "1.8"
     }
 }
 
