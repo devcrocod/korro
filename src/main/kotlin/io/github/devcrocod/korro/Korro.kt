@@ -136,6 +136,7 @@ fun KorroContext.korroClean(inputFile: File): Boolean {
                         when(nextDir?.name) {
                             END_DIRECTIVE -> {
                                 oldSampleLines.add(sampleLine)
+                                lines.add(sampleLine)
                                 break
                             }
                             EOF, FUN_DIRECTIVE -> {
