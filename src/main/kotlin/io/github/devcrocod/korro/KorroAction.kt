@@ -9,6 +9,7 @@ import java.io.File
 interface KorroParameters : WorkParameters {
     var docs: Set<File>
     var samples: Set<File>
+    var groups: List<SamplesGroup>
     var name: String
 }
 
@@ -18,6 +19,7 @@ abstract class KorroAction : WorkAction<KorroParameters> {
     abstract val ext: KorroExtension
 
     override fun execute() {
+        ext.groups.addAll(parameters.groups)
         val ctx = ext.createContext(parameters.docs, parameters.samples)
 
         //TODO - check missing files!

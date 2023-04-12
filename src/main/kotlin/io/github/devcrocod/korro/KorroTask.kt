@@ -43,6 +43,9 @@ private interface KorroTasksCommon {
 
     var samples: FileCollection
 
+    @get:Internal
+    val groups: List<SamplesGroup>
+
     fun execute(clazz: Class<out WorkAction<KorroParameters>>) {
         val workQueue = workerExecutor.classLoaderIsolation {
             it.classpath.setFrom(classpath.resolve())
@@ -50,6 +53,7 @@ private interface KorroTasksCommon {
         workQueue.submit(clazz) {
             it.docs = docs.files
             it.samples = samples.files
+            it.groups = groups
             it.name = nameReference
         }
     }
@@ -68,6 +72,9 @@ abstract class KorroTask : DefaultTask(), KorroTasksCommon {
     override var samples: FileCollection = ext.samples ?: project.fileTree(project.rootDir) {
         it.include("**/*.kt")
     }
+
+    @get:Internal
+    override val groups: List<SamplesGroup> = ext.groups
 
     @get:Internal
     override val projectReference: Project
@@ -95,6 +102,9 @@ abstract class KorroCleanTask : Delete(), KorroTasksCommon {
     override var samples: FileCollection = ext.samples ?: project.fileTree(project.rootDir) {
         it.include("**/*.kt")
     }
+
+    @get:Internal
+    override val groups: List<SamplesGroup> = ext.groups
 
     @get:Internal
     override val projectReference: Project
