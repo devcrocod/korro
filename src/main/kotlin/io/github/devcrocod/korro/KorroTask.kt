@@ -1,65 +1,124 @@
 package io.github.devcrocod.korro
 
 import org.gradle.api.DefaultTask
-import org.gradle.api.GradleException
+import org.gradle.api.NamedDomainObjectContainer
+import org.gradle.api.Project
+import org.gradle.api.artifacts.Configuration
 import org.gradle.api.file.FileCollection
-import org.gradle.api.tasks.Delete
-import org.gradle.api.tasks.InputFiles
-import org.gradle.api.tasks.TaskAction
+import org.gradle.api.tasks.*
+import org.gradle.workers.WorkAction
+import org.gradle.workers.WorkerExecutor
+import javax.inject.Inject
 
-abstract class KorroTask : DefaultTask() {
-    private val ext: KorroExtension = project.extensions.getByType(KorroExtension::class.java)
+// TODO get from central version
+const val dokkaVersion = "1.8.10"
+private interface KorroTasksCommon {
+
+    @get:Internal
+    val projectReference: Project
+
+    @get:Internal
+    val nameReference: String
+
+    @get:Classpath
+    val classpath: Configuration
+        get() = projectReference.configurations.maybeCreate("korroRuntime") {
+            isCanBeConsumed = true
+            listOf(
+                "org.jetbrains.dokka:dokka-analysis",
+                "org.jetbrains.dokka:dokka-base",
+                "org.jetbrains.dokka:dokka-core",
+            ).forEach {
+                dependencies += projectReference.dependencies.create("$it:$dokkaVersion")
+            }
+        }
+
+    @get:Inject
+    val workerExecutor: WorkerExecutor
+
+    @get:Internal
+    val ext: KorroExtension
+
+    var docs: FileCollection
+
+    var samples: FileCollection
+
+    @get:Internal
+    val groups: List<SamplesGroup>
+
+    fun execute(clazz: Class<out WorkAction<KorroParameters>>) {
+        val workQueue = workerExecutor.classLoaderIsolation {
+            it.classpath.setFrom(classpath.resolve())
+        }
+        workQueue.submit(clazz) {
+            it.docs = docs.files
+            it.samples = samples.files
+            it.groups = groups
+            it.name = nameReference
+        }
+    }
+}
+
+abstract class KorroTask : DefaultTask(), KorroTasksCommon {
+
+    final override val ext: KorroExtension = project.extensions.getByType(KorroExtension::class.java)
 
     @InputFiles
-    var docs: FileCollection = ext.docs ?: project.fileTree(project.rootDir) {
+    override var docs: FileCollection = ext.docs ?: project.fileTree(project.rootDir) {
         it.include("**/*.md")
     }
 
     @InputFiles
-    var samples: FileCollection = ext.samples ?: project.fileTree(project.rootDir) {
+    override var samples: FileCollection = ext.samples ?: project.fileTree(project.rootDir) {
         it.include("**/*.kt")
     }
+
+    @get:Internal
+    override val groups: List<SamplesGroup> = ext.groups
+
+    @get:Internal
+    override val projectReference: Project
+        get() = project
+
+    @get:Internal
+    override val nameReference: String
+        get() = name
 
     @TaskAction
     fun korro() {
-        val ctx = ext.createContext(docs.files, samples.files)
-
-        //TODO - check missing files!
-
-        //TODO - process!!! error
-        if (!ctx.process()) {
-            val extra = if (ctx.logger.nOutdated > 0)
-                "\nRun 'korro' task to write ${ctx.logger.nOutdated} missing/outdated files."
-            else
-                ""
-            throw GradleException("$name task failed, see log for details (use '--info' for detailed log).$extra")
-        }
+        execute(KorroAction::class.java)
     }
 }
 
-abstract class KorroCleanTask : Delete() {
-    private val ext: KorroExtension = project.extensions.getByType(KorroExtension::class.java)
+abstract class KorroCleanTask : Delete(), KorroTasksCommon {
+    final override val ext: KorroExtension = project.extensions.getByType(KorroExtension::class.java)
 
     @InputFiles
-    var docs: FileCollection = ext.docs ?: project.fileTree(project.rootDir) {
+    override var docs: FileCollection = ext.docs ?: project.fileTree(project.rootDir) {
         it.include("**/*.md")
     }
 
     @InputFiles
-    var samples: FileCollection = ext.samples ?: project.fileTree(project.rootDir) {
+    override var samples: FileCollection = ext.samples ?: project.fileTree(project.rootDir) {
         it.include("**/*.kt")
     }
 
+    @get:Internal
+    override val groups: List<SamplesGroup> = ext.groups
+
+    @get:Internal
+    override val projectReference: Project
+        get() = project
+
+    @get:Internal
+    override val nameReference: String
+        get() = name
+
     @TaskAction
     fun korroClean() {
-        val ctx = ext.createContext(docs.files, samples.files)
-
-        if (!ctx.processClean()) {
-            val extra = if (ctx.logger.nOutdated > 0)
-                "\nRun 'korro' task to write ${ctx.logger.nOutdated} missing/outdated files."
-            else
-                ""
-            throw GradleException("$name task failed, see log for details (use '--info' for detailed log).$extra")
-        }
+        execute(KorroCleanAction::class.java)
     }
 }
+
+private fun <T : Any> NamedDomainObjectContainer<T>.maybeCreate(name: String, configuration: T.() -> Unit): T =
+    findByName(name) ?: create(name, configuration)

@@ -9,7 +9,6 @@ import com.intellij.psi.util.PsiTreeUtil
 import org.jetbrains.dokka.Platform
 import org.jetbrains.dokka.analysis.AnalysisEnvironment
 import org.jetbrains.dokka.analysis.DokkaResolutionFacade
-import org.jetbrains.dokka.analysis.EnvironmentAndFacade
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSourceLocation
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
@@ -168,14 +167,14 @@ class SamplesTransformer(private val context: KorroContext) {
     }
 
     operator fun invoke(functionName: String): String? {
-        val facade = setUpAnalysis().facade
+        val facade = setUpAnalysis()
         val psiElement = fqNameToPsiElement(facade, functionName)
             ?: return null//.also { context.logger.warn("Cannot find PsiElement corresponding to $functionName") }
         val body = processBody(psiElement)
         return createSampleBody(body)
     }
 
-    private fun setUpAnalysis(): EnvironmentAndFacade =
+    private fun setUpAnalysis(): DokkaResolutionFacade =
         AnalysisEnvironment(KorroMessageCollector(context.logger), Platform.jvm).run {
             addClasspath(PathUtil.getJdkClassesRootsFromCurrentJre())
             addSources(context.sampleSet.toList())
@@ -183,7 +182,7 @@ class SamplesTransformer(private val context: KorroContext) {
 
             val environment = createCoreEnvironment()
             val (facade, _) = createResolutionFacade(environment)
-            EnvironmentAndFacade(environment, facade)
+            facade
         }
 
     private fun createSampleBody(body: String) =

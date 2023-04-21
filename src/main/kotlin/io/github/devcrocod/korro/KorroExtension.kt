@@ -49,7 +49,7 @@ abstract class KorroExtension {
     var docs: FileCollection? = null
     var samples: FileCollection? = null
 
-    private val groups = mutableListOf<SamplesGroup>()
+    internal val groups = mutableListOf<SamplesGroup>()
 
     @Nested
     abstract fun getGroupSamples(): GroupSamplesApi

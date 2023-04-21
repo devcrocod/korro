@@ -3,9 +3,9 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
     kotlin("jvm")
     `java-gradle-plugin`
-    id("com.gradle.plugin-publish") version ("1.1.0")
+    id("com.gradle.plugin-publish") version "1.1.0"
     `maven-publish`
-    id("com.github.johnrengelman.shadow") version "7.1.2"
+    id("com.github.johnrengelman.shadow") version "8.1.1"
 }
 
 group = "io.github.devcrocod"
@@ -36,28 +36,17 @@ val kotlin_version: String by project
 dependencies {
     shadow(kotlin("stdlib-jdk8", version = kotlin_version))
     shadow("org.jetbrains.dokka:dokka-core:$dokka_version")
+    shadow("org.jetbrains.dokka:dokka-analysis:$dokka_version")
 
-    compileOnly(gradleApi())
-    implementation("org.jetbrains.dokka:dokka-analysis:$dokka_version")
+    shadow(gradleApi())
+    shadow(gradleKotlinDsl())
 }
 
-tasks {
-    shadowJar {
-        relocate("com.intellij", "io.github.devcrocod.com.intellij")
-        relocate("org.jetbrains.kotlin", "io.github.devcrocod.org.jetbrains.kotlin")
-        mergeServiceFiles()
-
-        archiveClassifier.set("")
-        dependencies {
-            exclude(dependency("org.jetbrains.kotlin:kotlin-stdlib"))
-            exclude(dependency("org.jetbrains.kotlin:kotlin-stdlib-jdk8"))
-            exclude(dependency("org.jetbrains.kotlin:kotlin-stdlib-jdk7"))
-            exclude(dependency("org.jetbrains.kotlin:kotlin-stdlib-common"))
-            exclude(dependency("org.jetbrains:annotations"))
-            exclude(dependency("org.jetbrains.dokka:dokka-core:$dokka_version"))
-        }
-    }
+tasks.shadowJar {
+    isZip64 = true
+    archiveClassifier.set("")
 }
+
 
 tasks.jar {
     enabled = false
@@ -95,4 +84,15 @@ gradlePlugin {
             tags.set(listOf("kotlin", "documentation", "markdown"))
         }
     }
+}
+
+tasks.withType<KotlinCompile> {
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+}
+
+tasks.withType<JavaCompile> {
+    sourceCompatibility = JavaVersion.VERSION_1_8.toString()
+    targetCompatibility = JavaVersion.VERSION_1_8.toString()
 }
