@@ -7,11 +7,13 @@ class KorroContext(
     val logger: KorroLog,
     docs: Collection<File>,
     samples: Collection<File>,
+    outputs: Collection<File>,
     val groups: List<SamplesGroup>
 ) {
     // state
     val fileQueue = ArrayDeque(docs)
     val sampleSet = HashSet(samples)
+    val outputsMap = outputs.associateBy { it.name }
 }
 
 fun KorroContext.process(): Boolean {
