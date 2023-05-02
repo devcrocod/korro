@@ -43,6 +43,8 @@ private interface KorroTasksCommon {
 
     var samples: FileCollection
 
+    var outputs: FileCollection
+
     @get:Internal
     val groups: List<SamplesGroup>
 
@@ -53,6 +55,7 @@ private interface KorroTasksCommon {
         workQueue.submit(clazz) {
             it.docs = docs.files
             it.samples = samples.files
+            it.outputs = outputs.files
             it.groups = groups
             it.name = nameReference
         }
@@ -72,6 +75,9 @@ abstract class KorroTask : DefaultTask(), KorroTasksCommon {
     override var samples: FileCollection = ext.samples ?: project.fileTree(project.rootDir) {
         it.include("**/*.kt")
     }
+
+    @InputFiles
+    override var outputs: FileCollection = ext.outputs ?: project.files()
 
     @get:Internal
     override val groups: List<SamplesGroup> = ext.groups
@@ -102,6 +108,9 @@ abstract class KorroCleanTask : Delete(), KorroTasksCommon {
     override var samples: FileCollection = ext.samples ?: project.fileTree(project.rootDir) {
         it.include("**/*.kt")
     }
+
+    @InputFiles
+    override var outputs: FileCollection = ext.outputs ?: project.files()
 
     @get:Internal
     override val groups: List<SamplesGroup> = ext.groups

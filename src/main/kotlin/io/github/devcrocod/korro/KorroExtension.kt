@@ -48,6 +48,7 @@ abstract class GroupSamplesApi {
 abstract class KorroExtension {
     var docs: FileCollection? = null
     var samples: FileCollection? = null
+    var outputs: FileCollection? = null
 
     internal val groups = mutableListOf<SamplesGroup>()
 
@@ -61,10 +62,11 @@ abstract class KorroExtension {
         groups.add(group)
     }
 
-    fun createContext(docs: Collection<File>, samples: Collection<File>) = KorroContext(
+    fun createContext(docs: Collection<File>, samples: Collection<File>, outputs: Collection<File>) = KorroContext(
         logger = LoggerLog(),
         docs = docs,
         samples = samples,
+        outputs = outputs,
         groups = groups
     )
 }

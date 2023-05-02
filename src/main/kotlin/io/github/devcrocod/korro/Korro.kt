@@ -32,7 +32,7 @@ fun KorroContext.korro(inputFile: File): Boolean {
             it + funName
         }
         val newSamplesLines = functionNames.firstNotNullOfOrNull { name -> // TODO: can be improved
-            val text = samplesTransformer(name) ?: groups.firstNotNullOfOrNull { group ->
+            var text = samplesTransformer(name) ?: groups.firstNotNullOfOrNull { group ->
                 group.patterns.mapNotNull { pattern ->
                     samplesTransformer(name + pattern.nameSuffix)?.let {
                         group.beforeSample?.let { pattern.processSubstitutions(it) } + it +
@@ -44,6 +44,12 @@ fun KorroContext.korro(inputFile: File): Boolean {
                     postfix = group.afterGroup ?: ""
                 )
             }
+
+            val output = outputsMap[name]
+            if (text != null && output != null) {
+                text += output.readText()
+            }
+
             text?.split("\n")?.plus(END_SAMPLE) //?: oldSampleLines
         }
         if (newSamplesLines == null) {
@@ -136,6 +142,7 @@ fun KorroContext.korroClean(inputFile: File): Boolean {
                         when(nextDir?.name) {
                             END_DIRECTIVE -> {
                                 oldSampleLines.add(sampleLine)
+                                lines.add(sampleLine)
                                 break
                             }
                             EOF, FUN_DIRECTIVE -> {
