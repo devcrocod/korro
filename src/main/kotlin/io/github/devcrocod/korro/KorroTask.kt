@@ -11,7 +11,7 @@ import org.gradle.workers.WorkerExecutor
 import javax.inject.Inject
 
 // TODO get from central version
-const val dokkaVersion = "1.8.10"
+const val dokkaVersion = "1.8.20"
 private interface KorroTasksCommon {
 
     @get:Internal
