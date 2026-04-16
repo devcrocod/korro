@@ -26,6 +26,8 @@ import java.io.StringWriter
 
 class SamplesTransformer(private val context: KorroContext) {
 
+    private val facade: DokkaResolutionFacade by lazy { setUpAnalysis() }
+
     private class SampleBuilder : KtTreeVisitorVoid() {
         val builder = StringBuilder()
         val text: String
@@ -167,7 +169,6 @@ class SamplesTransformer(private val context: KorroContext) {
     }
 
     operator fun invoke(functionName: String): String? {
-        val facade = setUpAnalysis()
         val psiElement = fqNameToPsiElement(facade, functionName)
             ?: return null//.also { context.logger.warn("Cannot find PsiElement corresponding to $functionName") }
         val body = processBody(psiElement)
