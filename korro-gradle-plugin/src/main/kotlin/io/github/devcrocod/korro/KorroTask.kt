@@ -6,6 +6,7 @@ import org.gradle.api.Project
 import org.gradle.api.artifacts.Configuration
 import org.gradle.api.file.FileCollection
 import org.gradle.api.tasks.*
+import org.gradle.work.DisableCachingByDefault
 import org.gradle.workers.WorkAction
 import org.gradle.workers.WorkerExecutor
 import javax.inject.Inject
@@ -62,21 +63,25 @@ private interface KorroTasksCommon {
     }
 }
 
+@DisableCachingByDefault(because = "Rewrites source markdown in place; Phase 2 introduces out-of-place writes and caching.")
 abstract class KorroTask : DefaultTask(), KorroTasksCommon {
 
     final override val ext: KorroExtension = project.extensions.getByType(KorroExtension::class.java)
 
     @InputFiles
+    @PathSensitive(PathSensitivity.RELATIVE)
     override var docs: FileCollection = ext.docs ?: project.fileTree(project.rootDir) {
         it.include("**/*.md")
     }
 
     @InputFiles
+    @PathSensitive(PathSensitivity.RELATIVE)
     override var samples: FileCollection = ext.samples ?: project.fileTree(project.rootDir) {
         it.include("**/*.kt")
     }
 
     @InputFiles
+    @PathSensitive(PathSensitivity.RELATIVE)
     override var outputs: FileCollection = ext.outputs ?: project.files()
 
     @get:Internal
@@ -96,20 +101,24 @@ abstract class KorroTask : DefaultTask(), KorroTasksCommon {
     }
 }
 
+@DisableCachingByDefault(because = "Deletes FUN/END blocks from source markdown; not cacheable.")
 abstract class KorroCleanTask : Delete(), KorroTasksCommon {
     final override val ext: KorroExtension = project.extensions.getByType(KorroExtension::class.java)
 
     @InputFiles
+    @PathSensitive(PathSensitivity.RELATIVE)
     override var docs: FileCollection = ext.docs ?: project.fileTree(project.rootDir) {
         it.include("**/*.md")
     }
 
     @InputFiles
+    @PathSensitive(PathSensitivity.RELATIVE)
     override var samples: FileCollection = ext.samples ?: project.fileTree(project.rootDir) {
         it.include("**/*.kt")
     }
 
     @InputFiles
+    @PathSensitive(PathSensitivity.RELATIVE)
     override var outputs: FileCollection = ext.outputs ?: project.files()
 
     @get:Internal
