@@ -1,6 +1,5 @@
 package io.github.devcrocod.korro
 
-import org.jetbrains.kotlin.utils.addToStdlib.firstNotNullResult
 import java.io.File
 
 const val DIRECTIVE_START = "<!---"
@@ -16,16 +15,11 @@ const val END_SAMPLE = DIRECTIVE_START + END_DIRECTIVE + DIRECTIVE_END
 val DIRECTIVE_REGEX =
     Regex("$DIRECTIVE_START\\s*([_a-zA-Z.]+)(?:\\s+(.+?(?=$DIRECTIVE_END|)))?(?:\\s*($DIRECTIVE_END))?\\s*")
 
-fun KorroContext.korro(inputFile: File): Boolean {
+fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
     logger.info("*** Reading $inputFile")
-    val inputFileType = inputFile.type()
-    if (inputFileType != InputFileType.MARKDOWN) {
-        logger.warn("WARNING: $inputFile: Unknown input file type. Treating it as markdown.")
-    }
-    val samplesTransformer = SamplesTransformer(this)
+    val samplesTransformer = SamplesTransformer(this, rewriteAsserts)
     val lines = ArrayList<String>()
     val imports = mutableListOf("")
-    var rewrite = false
 
     fun processFun(funName: String, oldSampleLines: List<String>) {
         val functionNames = imports.map {
@@ -50,13 +44,12 @@ fun KorroContext.korro(inputFile: File): Boolean {
                 text += output.readText()
             }
 
-            text?.split("\n")?.plus(END_SAMPLE) //?: oldSampleLines
+            text?.split("\n")?.plus(END_SAMPLE)
         }
         if (newSamplesLines == null) {
             logger.warn("Cannot find PsiElement corresponding to '$funName'")
         }
         if (newSamplesLines != null && oldSampleLines != newSamplesLines) {
-            rewrite = true
             logger.info("*** Add $funName sample")
             lines.addAll(newSamplesLines)
         } else {
@@ -79,8 +72,8 @@ fun KorroContext.korro(inputFile: File): Boolean {
                     val oldSampleLines = ArrayList<String>()
                     while (true) {
                         val sampleLine = bufferedReader.readLine()
-                        val nextDirective = if(sampleLine != null) parseDirective(sampleLine) else Directive(EOF, "")
-                        when(nextDirective?.name){
+                        val nextDirective = if (sampleLine != null) parseDirective(sampleLine) else Directive(EOF, "")
+                        when (nextDirective?.name) {
                             END_DIRECTIVE -> {
                                 oldSampleLines.add(sampleLine)
                                 break
@@ -89,8 +82,7 @@ fun KorroContext.korro(inputFile: File): Boolean {
                                 processFun(directive!!.value, emptyList())
                                 lines.addAll(oldSampleLines)
                                 oldSampleLines.clear()
-                                if(sampleLine == null) // eof
-                                {
+                                if (sampleLine == null) {
                                     directive = null
                                     break
                                 }
@@ -102,8 +94,7 @@ fun KorroContext.korro(inputFile: File): Boolean {
                             }
                         }
                     }
-                    if(directive == null) // eof
-                        break
+                    if (directive == null) break
                     processFun(directive.value, oldSampleLines)
                 }
                 FUNS_DIRECTIVE -> {
@@ -112,68 +103,10 @@ fun KorroContext.korro(inputFile: File): Boolean {
             }
         }
     }
-    if (rewrite) {
-        inputFile.printWriter().use { out ->
-            lines.forEach { out.println(it) }
-        }
-    }
-    return true
-}
 
-fun KorroContext.korroClean(inputFile: File): Boolean {
-    logger.info("*** Cleaning $inputFile")
-    val inputFileType = inputFile.type()
-    if (inputFileType != InputFileType.MARKDOWN) {
-        logger.warn("WARNING: $inputFile: Unknown input file type. Treating it as markdown.")
-    }
-    val lines = ArrayList<String>()
-    var rewrite = false
-    inputFile.bufferedReader().use { bufferedReader ->
-        while (true) {
-            val line = bufferedReader.readLine() ?: break
-            lines.add(line)
-            var directive = parseDirective(line)
-            when (directive?.name) {
-                FUN_DIRECTIVE -> {
-                    val oldSampleLines = ArrayList<String>()
-                    while (true) {
-                        val sampleLine = bufferedReader.readLine()
-                        val nextDir = if(sampleLine != null) parseDirective(sampleLine) else Directive(EOF, "")
-                        when(nextDir?.name) {
-                            END_DIRECTIVE -> {
-                                oldSampleLines.add(sampleLine)
-                                lines.add(sampleLine)
-                                break
-                            }
-                            EOF, FUN_DIRECTIVE -> {
-                                lines.addAll(oldSampleLines)
-                                oldSampleLines.clear()
-                                if(sampleLine == null)
-                                    break
-                                lines.add(sampleLine)
-                                directive = nextDir
-                            }
-                            else -> {
-                                oldSampleLines.add(sampleLine)
-                            }
-                        }
-                    }
-                    if (oldSampleLines.isNotEmpty()) {
-                        rewrite = true
-                        logger.info("*** Clean ${directive?.value} sample")
-                    }
-                }
-                FUNS_DIRECTIVE -> {
-                }
-                else -> {
-                }
-            }
-        }
-    }
-    if (rewrite) {
-        inputFile.printWriter().use { out ->
-            lines.forEach { out.println(it) }
-        }
+    outputFile.parentFile?.mkdirs()
+    outputFile.printWriter().use { out ->
+        lines.forEach { out.println(it) }
     }
     return true
 }
@@ -191,12 +124,3 @@ fun parseDirective(line: String): Directive? {
     require(groups.last().value == DIRECTIVE_END) { "Directive must end on the same line with '$DIRECTIVE_END'" }
     return Directive(groups[1].value.trim(), groups.getOrNull(2)?.value?.trim() ?: "")
 }
-
-enum class InputFileType(
-    val extension: String
-) {
-    MARKDOWN(".md"),
-    UNKNOWN("") // works just like MARKDOWN
-}
-
-fun File.type(): InputFileType = InputFileType.values().first { name.endsWith(it.extension) }

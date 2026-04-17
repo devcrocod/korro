@@ -1,142 +1,114 @@
 package io.github.devcrocod.korro
 
 import org.gradle.api.DefaultTask
-import org.gradle.api.NamedDomainObjectContainer
-import org.gradle.api.Project
-import org.gradle.api.artifacts.Configuration
-import org.gradle.api.file.FileCollection
-import org.gradle.api.tasks.*
+import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.provider.Provider
+import org.gradle.api.tasks.CacheableTask
+import org.gradle.api.tasks.Classpath
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.Nested
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.TaskAction
 import org.gradle.work.DisableCachingByDefault
-import org.gradle.workers.WorkAction
 import org.gradle.workers.WorkerExecutor
+import java.io.File
 import javax.inject.Inject
 
-// TODO get from central version
-const val dokkaVersion = "1.8.20"
-private interface KorroTasksCommon {
+internal const val DOKKA_VERSION = "1.8.20"
 
-    @get:Internal
-    val projectReference: Project
-
-    @get:Internal
-    val nameReference: String
-
-    @get:Classpath
-    val classpath: Configuration
-        get() = projectReference.configurations.maybeCreate("korroRuntime") {
-            isCanBeConsumed = true
-            listOf(
-                "org.jetbrains.dokka:dokka-analysis",
-                "org.jetbrains.dokka:dokka-base",
-                "org.jetbrains.dokka:dokka-core",
-            ).forEach {
-                dependencies += projectReference.dependencies.create("$it:$dokkaVersion")
-            }
-        }
+@DisableCachingByDefault(because = "Abstract base; concrete subclasses opt in with @CacheableTask.")
+abstract class AbstractKorroTask : DefaultTask() {
 
     @get:Inject
-    val workerExecutor: WorkerExecutor
+    abstract val workerExecutor: WorkerExecutor
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val docs: ConfigurableFileCollection
 
     @get:Internal
-    val ext: KorroExtension
+    abstract val docsBaseDir: DirectoryProperty
 
-    var docs: FileCollection
-
-    var samples: FileCollection
-
-    var outputs: FileCollection
-
-    @get:Internal
-    val groups: List<SamplesGroup>
-
-    fun execute(clazz: Class<out WorkAction<KorroParameters>>) {
-        val workQueue = workerExecutor.classLoaderIsolation {
-            it.classpath.setFrom(classpath.resolve())
+    @get:Input
+    val docsRelativePaths: Provider<List<String>>
+        get() = docs.elements.map { files ->
+            val base = docsBaseDir.get().asFile
+            files.map { it.asFile.toRelativeString(base) }.sorted()
         }
-        workQueue.submit(clazz) {
-            it.docs = docs.files
-            it.samples = samples.files
-            it.outputs = outputs.files
-            it.groups = groups
-            it.name = nameReference
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val samples: ConfigurableFileCollection
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val samplesOutputs: ConfigurableFileCollection
+
+    @get:Input
+    abstract val rewriteAsserts: Property<Boolean>
+
+    @get:Input
+    abstract val ignoreMissing: Property<Boolean>
+
+    @get:Input
+    abstract val korroPluginVersion: Property<String>
+
+    @get:Nested
+    abstract val groupSamples: GroupSamplesApi
+
+    @get:Classpath
+    abstract val korroRuntimeClasspath: ConfigurableFileCollection
+
+    protected fun buildSamplesGroups(): List<SamplesGroup> = listOf(
+        SamplesGroup(
+            beforeGroup = groupSamples.beforeGroup.get(),
+            afterGroup = groupSamples.afterGroup.get(),
+            beforeSample = groupSamples.beforeSample.get(),
+            afterSample = groupSamples.afterSample.get(),
+            patterns = groupSamples.patterns.get(),
+        )
+    )
+
+    protected fun buildDocsToOutputs(outDir: File): Map<File, File> {
+        val base = docsBaseDir.get().asFile
+        return docs.files.associateWith { input ->
+            val rel = input.toRelativeString(base)
+            check(!rel.startsWith("..")) {
+                "$input is outside docs.baseDir=$base. Set docs.baseDir to a directory that contains all docs."
+            }
+            File(outDir, rel)
         }
     }
 }
 
-@DisableCachingByDefault(because = "Rewrites source markdown in place; Phase 2 introduces out-of-place writes and caching.")
-abstract class KorroTask : DefaultTask(), KorroTasksCommon {
+@CacheableTask
+abstract class KorroTask : AbstractKorroTask() {
 
-    final override val ext: KorroExtension = project.extensions.getByType(KorroExtension::class.java)
-
-    @InputFiles
-    @PathSensitive(PathSensitivity.RELATIVE)
-    override var docs: FileCollection = ext.docs ?: project.fileTree(project.rootDir) {
-        it.include("**/*.md")
-    }
-
-    @InputFiles
-    @PathSensitive(PathSensitivity.RELATIVE)
-    override var samples: FileCollection = ext.samples ?: project.fileTree(project.rootDir) {
-        it.include("**/*.kt")
-    }
-
-    @InputFiles
-    @PathSensitive(PathSensitivity.RELATIVE)
-    override var outputs: FileCollection = ext.outputs ?: project.files()
-
-    @get:Internal
-    override val groups: List<SamplesGroup> = ext.groups
-
-    @get:Internal
-    override val projectReference: Project
-        get() = project
-
-    @get:Internal
-    override val nameReference: String
-        get() = name
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
 
     @TaskAction
     fun korro() {
-        execute(KorroAction::class.java)
+        val outDir = outputDirectory.get().asFile
+        val docsToOutputs = buildDocsToOutputs(outDir)
+        val queue = workerExecutor.classLoaderIsolation {
+            it.classpath.from(korroRuntimeClasspath)
+        }
+        queue.submit(KorroWorkAction::class.java) { p ->
+            p.docsToOutputs = docsToOutputs
+            p.samples = samples.files
+            p.sampleOutputs = samplesOutputs.files
+            p.groups = buildSamplesGroups()
+            p.rewriteAsserts = rewriteAsserts.get()
+            p.ignoreMissing = ignoreMissing.get()
+            p.korroPluginVersion = korroPluginVersion.get()
+            p.taskName = name
+        }
     }
 }
-
-@DisableCachingByDefault(because = "Deletes FUN/END blocks from source markdown; not cacheable.")
-abstract class KorroCleanTask : Delete(), KorroTasksCommon {
-    final override val ext: KorroExtension = project.extensions.getByType(KorroExtension::class.java)
-
-    @InputFiles
-    @PathSensitive(PathSensitivity.RELATIVE)
-    override var docs: FileCollection = ext.docs ?: project.fileTree(project.rootDir) {
-        it.include("**/*.md")
-    }
-
-    @InputFiles
-    @PathSensitive(PathSensitivity.RELATIVE)
-    override var samples: FileCollection = ext.samples ?: project.fileTree(project.rootDir) {
-        it.include("**/*.kt")
-    }
-
-    @InputFiles
-    @PathSensitive(PathSensitivity.RELATIVE)
-    override var outputs: FileCollection = ext.outputs ?: project.files()
-
-    @get:Internal
-    override val groups: List<SamplesGroup> = ext.groups
-
-    @get:Internal
-    override val projectReference: Project
-        get() = project
-
-    @get:Internal
-    override val nameReference: String
-        get() = name
-
-    @TaskAction
-    fun korroClean() {
-        execute(KorroCleanAction::class.java)
-    }
-}
-
-private fun <T : Any> NamedDomainObjectContainer<T>.maybeCreate(name: String, configuration: T.() -> Unit): T =
-    findByName(name) ?: create(name, configuration)

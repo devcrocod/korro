@@ -24,11 +24,14 @@ import org.jetbrains.kotlin.utils.PathUtil
 import java.io.PrintWriter
 import java.io.StringWriter
 
-class SamplesTransformer(private val context: KorroContext) {
+class SamplesTransformer(
+    private val context: KorroContext,
+    private val rewriteAsserts: Boolean,
+) {
 
     private val facade: DokkaResolutionFacade by lazy { setUpAnalysis() }
 
-    private class SampleBuilder : KtTreeVisitorVoid() {
+    private class SampleBuilder(private val rewriteAsserts: Boolean) : KtTreeVisitorVoid() {
         val builder = StringBuilder()
         val text: String
             get() = builder.toString()
@@ -113,14 +116,16 @@ class SamplesTransformer(private val context: KorroContext) {
         }
 
         override fun visitCallExpression(expression: KtCallExpression) {
-            when (expression.calleeExpression?.text) {
-                "assertPrints" -> convertAssertPrints(expression)
-                "assertTrue" -> convertAssertTrueFalse(expression, expectedResult = true)
-                "assertFalse" -> convertAssertTrueFalse(expression, expectedResult = false)
-                "assertFails" -> convertAssertFails(expression)
-                "assertFailsWith" -> convertAssertFailsWith(expression)
-                else -> super.visitCallExpression(expression)
+            if (rewriteAsserts) {
+                when (expression.calleeExpression?.text) {
+                    "assertPrints" -> { convertAssertPrints(expression); return }
+                    "assertTrue" -> { convertAssertTrueFalse(expression, expectedResult = true); return }
+                    "assertFalse" -> { convertAssertTrueFalse(expression, expectedResult = false); return }
+                    "assertFails" -> { convertAssertFails(expression); return }
+                    "assertFailsWith" -> { convertAssertFailsWith(expression); return }
+                }
             }
+            super.visitCallExpression(expression)
         }
 
         private fun reportProblemConvertingElement(element: PsiElement, e: Exception) {
@@ -221,7 +226,7 @@ class SamplesTransformer(private val context: KorroContext) {
     }
 
     private fun PsiElement.buildSampleText(): String {
-        val sampleBuilder = SampleBuilder()
+        val sampleBuilder = SampleBuilder(rewriteAsserts)
         this.accept(sampleBuilder)
 
         sampleBuilder.errors.forEach {
