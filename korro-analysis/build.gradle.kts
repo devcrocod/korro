@@ -1,10 +1,8 @@
 plugins {
-    kotlin("jvm")
-    id("com.gradleup.shadow") version "9.4.1"
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.shadow)
     `maven-publish`
 }
-
-val kotlin_version: String by project
 
 repositories {
     mavenCentral()
@@ -12,19 +10,19 @@ repositories {
 }
 
 dependencies {
-    compileOnly(kotlin("stdlib"))
+    compileOnly(libs.kotlin.stdlib)
 
-    implementation("org.jetbrains.kotlin:analysis-api-for-ide:$kotlin_version") { isTransitive = false }
-    implementation("org.jetbrains.kotlin:analysis-api-impl-base-for-ide:$kotlin_version") { isTransitive = false }
-    implementation("org.jetbrains.kotlin:analysis-api-platform-interface-for-ide:$kotlin_version") { isTransitive = false }
-    implementation("org.jetbrains.kotlin:analysis-api-standalone-for-ide:$kotlin_version") { isTransitive = false }
-    implementation("org.jetbrains.kotlin:analysis-api-k2-for-ide:$kotlin_version") { isTransitive = false }
-    implementation("org.jetbrains.kotlin:low-level-api-fir-for-ide:$kotlin_version") { isTransitive = false }
-    implementation("org.jetbrains.kotlin:symbol-light-classes-for-ide:$kotlin_version") { isTransitive = false }
+    implementation(libs.kotlin.analysisApi) { isTransitive = false }
+    implementation(libs.kotlin.analysisApi.implBase) { isTransitive = false }
+    implementation(libs.kotlin.analysisApi.platformInterface) { isTransitive = false }
+    implementation(libs.kotlin.analysisApi.standalone) { isTransitive = false }
+    implementation(libs.kotlin.analysisApi.k2) { isTransitive = false }
+    implementation(libs.kotlin.lowLevelApiFir) { isTransitive = false }
+    implementation(libs.kotlin.symbolLightClasses) { isTransitive = false }
 
-    implementation("org.jetbrains.kotlin:kotlin-compiler:$kotlin_version")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
-    implementation("com.github.ben-manes.caffeine:caffeine:3.2.3")
+    implementation(libs.kotlin.compiler)
+    implementation(libs.kotlinx.serialization.core)
+    implementation(libs.caffeine)
 }
 
 tasks.shadowJar {

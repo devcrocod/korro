@@ -27,11 +27,14 @@ The `korro` / `korroApply` / `korroCheck` tasks the plugin registers are only ru
 
 ## Version wiring
 
-Versions live in `gradle.properties`:
+Korro's own version lives in `gradle.properties` as `version`. Both modules inherit it through `subprojects { version = rootProject.version }` in the root `build.gradle.kts`. At runtime the plugin reads this from a generated `META-INF/korro-gradle-plugin.properties` resource on the plugin classpath (see `KorroPlugin.readKorroPluginVersion`).
 
-- `version` — Korro's own version. Both modules inherit this through `subprojects { version = rootProject.version }` in the root `build.gradle.kts`. At runtime the plugin reads this from a generated `META-INF/korro-gradle-plugin.properties` resource on the plugin classpath (see `KorroPlugin.readKorroPluginVersion`).
-- `kotlin_version` — the pinned Kotlin / Analysis API version used by `korro-analysis`. Single source of truth.
-- `language_version` — sets both Kotlin `languageVersion` and `apiVersion` in the subproject Kotlin compilation. Unrelated to the pinned Analysis API version. JVM target is hard-coded to `17` in the root `build.gradle.kts`.
+All other versions live in the Gradle version catalog at `gradle/libs.versions.toml`. The catalog is the single source of truth — don't hard-code versions in subproject build scripts, add them to the catalog and reference as `libs.*` / `libs.plugins.*`. Key entries:
+
+- `kotlin` — the pinned Kotlin / Analysis API version used by `korro-analysis` and for the `kotlin("jvm")` plugin.
+- `kotlinLanguage` — sets both Kotlin `languageVersion` and `apiVersion` in the subproject Kotlin compilation. Read in the root `build.gradle.kts` via `libs.versions.kotlinLanguage.get()`. Unrelated to the pinned Analysis API version. JVM target is hard-coded to `17` in the root `build.gradle.kts`.
+- `shadow`, `pluginPublish` — Gradle plugin versions consumed via `alias(libs.plugins.*)`.
+- `kotlinxSerialization`, `caffeine`, `junit` — runtime/test library versions.
 
 A new cache key: every task has an `@Input korroPluginVersion` property, so cached outputs are invalidated on plugin bump (which is also a bundled Analysis API bump).
 

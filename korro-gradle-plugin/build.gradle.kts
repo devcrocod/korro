@@ -1,18 +1,17 @@
 plugins {
-    kotlin("jvm")
+    alias(libs.plugins.kotlin.jvm)
     `java-gradle-plugin`
-    id("com.gradle.plugin-publish") version "2.1.1"
+    alias(libs.plugins.pluginPublish)
     `maven-publish`
-    id("com.gradleup.shadow") version "9.4.1"
+    alias(libs.plugins.shadow)
 }
 
 configurations.named(JavaPlugin.API_CONFIGURATION_NAME) {
     dependencies.remove(project.dependencies.gradleApi())
 }
 
-val kotlin_version: String by project
 dependencies {
-    shadow(kotlin("stdlib-jdk8", version = kotlin_version))
+    shadow(libs.kotlin.stdlib)
 
     compileOnly(project(":korro-analysis"))
 

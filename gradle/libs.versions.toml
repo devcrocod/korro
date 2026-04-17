@@ -1,0 +1,32 @@
+[versions]
+kotlin = "2.3.20"
+kotlinLanguage = "2.1"
+shadow = "9.4.1"
+pluginPublish = "2.1.1"
+kotlinxSerialization = "1.11.0"
+caffeine = "3.2.3"
+junit = "5.14.3"
+
+[libraries]
+kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
+kotlin-compiler = { module = "org.jetbrains.kotlin:kotlin-compiler", version.ref = "kotlin" }
+
+kotlin-analysisApi = { module = "org.jetbrains.kotlin:analysis-api-for-ide", version.ref = "kotlin" }
+kotlin-analysisApi-implBase = { module = "org.jetbrains.kotlin:analysis-api-impl-base-for-ide", version.ref = "kotlin" }
+kotlin-analysisApi-platformInterface = { module = "org.jetbrains.kotlin:analysis-api-platform-interface-for-ide", version.ref = "kotlin" }
+kotlin-analysisApi-standalone = { module = "org.jetbrains.kotlin:analysis-api-standalone-for-ide", version.ref = "kotlin" }
+kotlin-analysisApi-k2 = { module = "org.jetbrains.kotlin:analysis-api-k2-for-ide", version.ref = "kotlin" }
+kotlin-lowLevelApiFir = { module = "org.jetbrains.kotlin:low-level-api-fir-for-ide", version.ref = "kotlin" }
+kotlin-symbolLightClasses = { module = "org.jetbrains.kotlin:symbol-light-classes-for-ide", version.ref = "kotlin" }
+
+kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinxSerialization" }
+caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "caffeine" }
+
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
+pluginPublish = { id = "com.gradle.plugin-publish", version.ref = "pluginPublish" }

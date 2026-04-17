@@ -3,7 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") apply false
+    alias(libs.plugins.kotlin.jvm) apply false
 }
 
 group = "io.github.devcrocod"
@@ -19,7 +19,7 @@ fun detectVersion(): String {
     }
 }
 
-val language_version: String by project
+val kotlinLanguageVersion = libs.versions.kotlinLanguage.get()
 
 subprojects {
     group = rootProject.group
@@ -37,8 +37,8 @@ subprojects {
                 "-Xskip-metadata-version-check",
                 "-Xjsr305=strict",
             )
-            languageVersion.set(KotlinVersion.fromVersion(language_version))
-            apiVersion.set(KotlinVersion.fromVersion(language_version))
+            languageVersion.set(KotlinVersion.fromVersion(kotlinLanguageVersion))
+            apiVersion.set(KotlinVersion.fromVersion(kotlinLanguageVersion))
             jvmTarget.set(JvmTarget.JVM_17)
         }
     }
