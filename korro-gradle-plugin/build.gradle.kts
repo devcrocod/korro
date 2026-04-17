@@ -1,24 +1,39 @@
 plugins {
     kotlin("jvm")
     `java-gradle-plugin`
-    id("com.gradle.plugin-publish") version "1.1.0"
+    id("com.gradle.plugin-publish") version "2.1.1"
     `maven-publish`
-    id("com.gradleup.shadow") version "8.3.5"
+    id("com.gradleup.shadow") version "9.4.1"
 }
 
 configurations.named(JavaPlugin.API_CONFIGURATION_NAME) {
     dependencies.remove(project.dependencies.gradleApi())
 }
 
-val dokka_version: String by project
 val kotlin_version: String by project
 dependencies {
     shadow(kotlin("stdlib-jdk8", version = kotlin_version))
-    shadow("org.jetbrains.dokka:dokka-core:$dokka_version")
-    shadow("org.jetbrains.dokka:dokka-analysis:$dokka_version")
+
+    compileOnly(project(":korro-analysis"))
 
     shadow(gradleApi())
     shadow(gradleKotlinDsl())
+}
+
+val generateKorroVersionResource by tasks.registering {
+    val outputDir = layout.buildDirectory.dir("generated/korroVersion")
+    val korroVersion = project.version.toString()
+    inputs.property("korroVersion", korroVersion)
+    outputs.dir(outputDir)
+    doLast {
+        val file = outputDir.get().file("META-INF/korro-gradle-plugin.properties").asFile
+        file.parentFile.mkdirs()
+        file.writeText("version=$korroVersion\n")
+    }
+}
+
+tasks.processResources {
+    from(generateKorroVersionResource)
 }
 
 tasks.shadowJar {

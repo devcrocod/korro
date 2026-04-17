@@ -14,6 +14,6 @@ korro {
         baseDir.set(layout.projectDirectory.dir("docs/in"))
     }
     samples {
-        from(fileTree("samples"))
+        from(fileTree("src/commonTest/kotlin"))
     }
 }

@@ -17,7 +17,7 @@ val DIRECTIVE_REGEX =
 
 fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
     logger.info("*** Reading $inputFile")
-    val samplesTransformer = SamplesTransformer(this, rewriteAsserts)
+    val samplesTransformer = this.samplesTransformer
     val lines = ArrayList<String>()
     val imports = mutableListOf("")
 

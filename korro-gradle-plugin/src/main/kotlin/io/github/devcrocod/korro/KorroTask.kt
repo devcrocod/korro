@@ -3,6 +3,7 @@ package io.github.devcrocod.korro
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.CacheableTask
@@ -19,8 +20,6 @@ import org.gradle.work.DisableCachingByDefault
 import org.gradle.workers.WorkerExecutor
 import java.io.File
 import javax.inject.Inject
-
-internal const val DOKKA_VERSION = "1.8.20"
 
 @DisableCachingByDefault(because = "Abstract base; concrete subclasses opt in with @CacheableTask.")
 abstract class AbstractKorroTask : DefaultTask() {

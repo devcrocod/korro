@@ -2,22 +2,21 @@ package io.github.devcrocod.korro
 
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import java.util.Properties
 
 class KorroPlugin : Plugin<Project> {
     override fun apply(project: Project): Unit = with(project) {
         val ext = extensions.create("korro", KorroExtension::class.java)
 
-        val runtime = configurations.create("korroRuntime") {
+        val korroPluginVersion = readKorroPluginVersion()
+
+        val runtime = configurations.create("korroAnalysisRuntime") {
             it.isCanBeConsumed = false
             it.isCanBeResolved = true
         }
-        listOf("dokka-analysis", "dokka-base", "dokka-core").forEach { art ->
-            dependencies.add(runtime.name, "org.jetbrains.dokka:$art:$DOKKA_VERSION")
-        }
+        dependencies.add(runtime.name, "io.github.devcrocod:korro-analysis:$korroPluginVersion")
 
         afterEvaluate {
-            val pluginVersion = version.toString()
-
             val korroTask = tasks.register("korro", KorroTask::class.java) { t ->
                 t.description = "Generates markdown docs with sample snippets into build/korro/docs."
                 t.group = "documentation"
@@ -34,7 +33,7 @@ class KorroPlugin : Plugin<Project> {
                 t.groupSamples.patterns.set(ext.groupSamples.patterns)
                 t.korroRuntimeClasspath.from(runtime)
                 t.outputDirectory.set(layout.buildDirectory.dir("korro/docs"))
-                t.korroPluginVersion.set(pluginVersion)
+                t.korroPluginVersion.set(korroPluginVersion)
             }
 
             tasks.register("korroApply", KorroApplyTask::class.java) { t ->
@@ -60,9 +59,18 @@ class KorroPlugin : Plugin<Project> {
                 t.groupSamples.afterSample.set(ext.groupSamples.afterSample)
                 t.groupSamples.patterns.set(ext.groupSamples.patterns)
                 t.korroRuntimeClasspath.from(runtime)
-                t.korroPluginVersion.set(pluginVersion)
+                t.korroPluginVersion.set(korroPluginVersion)
                 t.reportFile.set(layout.buildDirectory.file("korro/check.report"))
             }
         }
+    }
+
+    private fun readKorroPluginVersion(): String {
+        val resource = KorroPlugin::class.java.classLoader
+            .getResourceAsStream("META-INF/korro-gradle-plugin.properties")
+            ?: error("Cannot locate META-INF/korro-gradle-plugin.properties on the plugin classpath.")
+        val props = resource.use { Properties().apply { load(it) } }
+        return props.getProperty("version")
+            ?: error("Property 'version' missing from META-INF/korro-gradle-plugin.properties.")
     }
 }

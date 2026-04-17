@@ -1,20 +1,19 @@
 package io.github.devcrocod.korro
 
+import io.github.devcrocod.korro.analysis.SamplesTransformer
 import java.io.File
 
 class KorroContext(
     val logger: KorroLog,
     docsToOutputs: Map<File, File>,
-    samples: Collection<File>,
     sampleOutputs: Collection<File>,
     val groups: List<SamplesGroup>,
-    val rewriteAsserts: Boolean,
     val ignoreMissing: Boolean,
+    val samplesTransformer: SamplesTransformer,
 ) {
     val fileQueue: ArrayDeque<Pair<File, File>> = ArrayDeque(
         docsToOutputs.entries.map { (input, output) -> input to output }
     )
-    val sampleSet: Set<File> = samples.toHashSet()
     val outputsMap: Map<String, File> = sampleOutputs.associateBy { it.name }
 }
 

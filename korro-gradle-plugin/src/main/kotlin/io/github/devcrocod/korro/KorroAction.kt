@@ -1,5 +1,6 @@
 package io.github.devcrocod.korro
 
+import io.github.devcrocod.korro.analysis.SamplesTransformer
 import org.gradle.api.GradleException
 import org.gradle.workers.WorkAction
 import org.gradle.workers.WorkParameters
@@ -19,19 +20,20 @@ interface KorroParameters : WorkParameters {
 abstract class KorroWorkAction : WorkAction<KorroParameters> {
     override fun execute() {
         val p = parameters
-        val ctx = KorroContext(
-            logger = LoggerLog(),
-            docsToOutputs = p.docsToOutputs,
-            samples = p.samples,
-            sampleOutputs = p.sampleOutputs,
-            groups = p.groups,
-            rewriteAsserts = p.rewriteAsserts,
-            ignoreMissing = p.ignoreMissing,
-        )
-        if (!ctx.process()) {
-            throw GradleException(
-                "${p.taskName} failed, see log for details (use --info for detailed log)."
+        SamplesTransformer(p.samples, p.rewriteAsserts).use { transformer ->
+            val ctx = KorroContext(
+                logger = LoggerLog(),
+                docsToOutputs = p.docsToOutputs,
+                sampleOutputs = p.sampleOutputs,
+                groups = p.groups,
+                ignoreMissing = p.ignoreMissing,
+                samplesTransformer = transformer,
             )
+            if (!ctx.process()) {
+                throw GradleException(
+                    "${p.taskName} failed, see log for details (use --info for detailed log)."
+                )
+            }
         }
     }
 }

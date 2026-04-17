@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
@@ -29,20 +31,20 @@ subprojects {
     }
 
     tasks.withType<KotlinCompile>().configureEach {
-        kotlinOptions {
-            freeCompilerArgs = freeCompilerArgs + listOf(
+        compilerOptions {
+            freeCompilerArgs.addAll(
                 "-opt-in=kotlin.RequiresOptIn",
                 "-Xskip-metadata-version-check",
                 "-Xjsr305=strict",
             )
-            languageVersion = language_version
-            apiVersion = language_version
-            jvmTarget = "1.8"
+            languageVersion.set(KotlinVersion.fromVersion(language_version))
+            apiVersion.set(KotlinVersion.fromVersion(language_version))
+            jvmTarget.set(JvmTarget.JVM_17)
         }
     }
 
     tasks.withType<JavaCompile>().configureEach {
-        sourceCompatibility = JavaVersion.VERSION_1_8.toString()
-        targetCompatibility = JavaVersion.VERSION_1_8.toString()
+        sourceCompatibility = JavaVersion.VERSION_17.toString()
+        targetCompatibility = JavaVersion.VERSION_17.toString()
     }
 }
