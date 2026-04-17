@@ -15,3 +15,13 @@ data class SamplesGroup(
     val afterSample: String?,
     val patterns: List<FunctionPattern>
 ) : Serializable
+
+enum class Severity { ERROR, WARN }
+
+data class Diagnostic(
+    val severity: Severity,
+    val file: String,
+    val line: Int,
+    val message: String,
+    val hint: String? = null,
+) : Serializable

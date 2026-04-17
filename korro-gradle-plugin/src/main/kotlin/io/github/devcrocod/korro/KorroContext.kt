@@ -15,12 +15,12 @@ class KorroContext(
         docsToOutputs.entries.map { (input, output) -> input to output }
     )
     val outputsMap: Map<String, File> = sampleOutputs.associateBy { it.name }
+    val diagnostics: MutableList<Diagnostic> = mutableListOf()
 }
 
-fun KorroContext.process(): Boolean {
+fun KorroContext.process() {
     while (!fileQueue.isEmpty()) {
         val (input, output) = fileQueue.removeFirst()
-        if (!korro(input, output)) return false
+        korro(input, output)
     }
-    return true
 }

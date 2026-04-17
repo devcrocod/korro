@@ -29,11 +29,25 @@ abstract class KorroWorkAction : WorkAction<KorroParameters> {
                 ignoreMissing = p.ignoreMissing,
                 samplesTransformer = transformer,
             )
-            if (!ctx.process()) {
-                throw GradleException(
-                    "${p.taskName} failed, see log for details (use --info for detailed log)."
-                )
+            ctx.process()
+
+            val errors = ctx.diagnostics.filter { it.severity == Severity.ERROR }
+            if (errors.isNotEmpty()) {
+                throw GradleException(formatDiagnosticTable(p.taskName, errors))
             }
         }
     }
+}
+
+internal fun formatDiagnosticTable(taskName: String, errors: List<Diagnostic>): String {
+    val header = "$taskName: ${errors.size} error(s) found"
+    val sevWidth = errors.maxOf { it.severity.name.length }
+    val locWidth = errors.maxOf { "${it.file}:${it.line}".length }
+    val rows = errors.joinToString("\n") { d ->
+        val loc = "${d.file}:${d.line}".padEnd(locWidth)
+        val sev = d.severity.name.padEnd(sevWidth)
+        val hint = d.hint?.let { " ($it)" } ?: ""
+        "  $sev  $loc  ${d.message}$hint"
+    }
+    return "$header\n$rows"
 }

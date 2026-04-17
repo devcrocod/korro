@@ -35,6 +35,52 @@ class KorroIntegrationTest {
         )
     }
 
+    @Test
+    fun funsFixture(@TempDir tempDir: Path) {
+        runFixture(
+            name = "funs",
+            tempDir = tempDir,
+            generatedRelativePath = "build/korro/docs/readme.md",
+            expectedRelativePath = "funs/docs/expected/readme.md",
+        )
+    }
+
+    @Test
+    fun strictModeFailsOnMissing(@TempDir tempDir: Path) {
+        val fixture = loadFixture("strictErrors", tempDir)
+
+        val runner = GradleRunner.create()
+            .withProjectDir(fixture.toFile())
+            .withArguments("korro", "--stacktrace")
+            .forwardOutput()
+
+        configurePluginClasspath(runner)
+        System.getProperty("korro.testkit.gradleVersion")
+            ?.takeIf { it.isNotBlank() }
+            ?.let(runner::withGradleVersion)
+
+        val result = runner.buildAndFail()
+
+        assertEquals(TaskOutcome.FAILED, result.task(":korro")?.outcome, "korro task should fail in strict mode")
+        val output = result.output
+        assertTrue(output.contains("nonExistent")) {
+            "Expected failure output to name the unresolved directive 'nonExistent'; got:\n$output"
+        }
+        assertTrue(output.contains("error(s) found")) {
+            "Expected failure output to contain formatted diagnostic table header; got:\n$output"
+        }
+    }
+
+    @Test
+    fun ignoreMissingPreservesSource(@TempDir tempDir: Path) {
+        runFixture(
+            name = "ignoreMissing",
+            tempDir = tempDir,
+            generatedRelativePath = "build/korro/docs/broken.md",
+            expectedRelativePath = "ignoreMissing/docs/expected/broken.md",
+        )
+    }
+
     private fun runFixture(
         name: String,
         tempDir: Path,
