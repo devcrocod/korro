@@ -1,223 +1,273 @@
 # Korro
+
 [![Apache license](https://img.shields.io/badge/license-Apache%20License%202.0-blue.svg?style=flat)](https://www.apache.org/licenses/LICENSE-2.0)
-[![Gradle plugin](https://img.shields.io/maven-metadata/v/https/plugins.gradle.org/m2/io/github/devcrocod/korro/maven-metadata.xml.svg?label=Gradle+plugin)]
+[![Gradle plugin](https://img.shields.io/maven-metadata/v/https/plugins.gradle.org/m2/io/github/devcrocod/korro/maven-metadata.xml.svg?label=Gradle+plugin)](https://plugins.gradle.org/plugin/io.github.devcrocod.korro)
 
 Kotlin source code documentation plugin.
 
 Inspired by [kotlinx-knit](https://github.com/Kotlin/kotlinx-knit).
 
-This plugin produces code snippets into markdown documents from tests.
+Korro injects Kotlin sample snippets into markdown documents. You point it at some `.md` files and some Kotlin source
+files, mark regions with `<!---FUN ...-->` directives, and Korro fills those regions with the body of the referenced
+function.
 
 <!---TOC-->
+
 * [Setup](#setup)
+    * [Baseline](#baseline)
     * [Tasks](#tasks)
-    * [Parameters](#parameters)
-* [Docs](#docs)
-  * [Directives](#directives)
+    * [DSL](#dsl)
+    * [Behavior flags](#behavior-flags)
+    * [Grouping samples](#grouping-samples)
+* [Directives](#directives)
     * [IMPORT](#import)
     * [FUN](#fun)
     * [FUNS](#funs)
     * [END](#end)
-* [Sample](#sample)
+* [Example](#example)
+* [What changed in 0.2](#what-changed-in-02)
+
 <!---END-->
 
 ## Setup
-```groovy
+
+```kotlin
 plugins {
-    id("io.github.devcrocod.korro") version "0.0.3"
+    id("io.github.devcrocod.korro") version "0.2.0"
 }
 ```
 
-or 
+The legacy `buildscript { classpath … }` installation form is no longer supported. 0.2.0 requires the `plugins { }` DSL.
 
-```groovy
-buildscript {
-    dependencies {
-        classpath "io.github.devcrocod:korro:0.0.3"
-    }
-}
-                    
-apply plugin: 'io.github.devcrocod.korro'
-```
+### Baseline
+
+| Requirement                   | Version |
+|-------------------------------|---------|
+| Gradle                        | 8.5+    |
+| JDK (build + runtime)         | 17+     |
+| Kotlin Analysis API (bundled) | 2.3.20  |
+
+The bundled Kotlin version is pinned inside the plugin. Your consumer project's own `org.jetbrains.kotlin.*` plugin
+version is irrelevant — Korro runs the Analysis API inside a worker with an isolated classloader. Your sample code can
+be authored against any Kotlin version that the 2.3.20 Analysis API can parse.
 
 ### Tasks
 
-* `korro` - create/update samples in documentation
-* `korroClean` - remove inserted code snippets in documentation.
-Removes everything between the `FUN`/`END` and `FUNS`/`END` directives.
-* `korroCheck` - TODO
-* `korroTest` - TODO
+| Task         | Purpose                                                                                                                                    |
+|--------------|--------------------------------------------------------------------------------------------------------------------------------------------|
+| `korro`      | Regenerates markdown into `build/korro/docs/`. Cacheable. Never touches source files.                                                      |
+| `korroApply` | Copies generated output from `build/korro/docs/` onto `docs.baseDir`. Run locally after `korro` to propagate changes into the source tree. |
+| `korroCheck` | Regenerates docs into a temp directory and fails the build if the committed source tree is out of date. Run this in CI.                    |
 
-### Parameters
+There is no `korroClean` — use `./gradlew clean` or delete `build/korro/`. There is no `korroTest`.
 
-```groovy
+Typical workflow:
+
+```bash
+# Local authoring:
+./gradlew korro korroApply    # regenerate and update source markdown
+
+# CI:
+./gradlew korroCheck          # fail if docs drift from samples
+```
+
+### DSL
+
+```kotlin
 korro {
-    docs = fileTree(project.rootDir) {
-        include '**/*.md'
+    docs {
+        from(fileTree("docs") { include("**/*.md") })
+        baseDir.set(layout.projectDirectory.dir("docs"))   // REQUIRED
     }
-
-    samples = fileTree(project.rootDir) {
-        include 'src/test/samples/*.kt'
+    samples {
+        from(fileTree("src/test/samples"))
+        outputs.from(fileTree("build/sampleOutputs"))      // optional
+    }
+    behavior {
+        rewriteAsserts.set(false)
+        ignoreMissing.set(false)
     }
 }
 ```
 
-To insert several samples by single reference in markdown use `groupSamples`. For example, to wrap samples that have the same function name prefix followed by `_v1` or `_v2` within HTML tabs use the following configuration:
-```groovy
+- `docs.from(...)` is the set of markdown files to process.
+- `docs.baseDir` is **mandatory**. Output files land at `<buildDir>/korro/docs/<path-relative-to-baseDir>`, and
+  `korroApply` mirrors that tree back onto `baseDir`. Set it to whichever directory the paths in `docs.from` are rooted
+  under — typically `layout.projectDirectory` or `layout.projectDirectory.dir("docs")`.
+- `samples.from(...)` is the set of Kotlin source files scanned for `FUN`/`FUNS` targets.
+- `samples.outputs.from(...)` is optional. A file in this collection whose name exactly equals a resolved `FUN`
+  fully-qualified name is appended verbatim after the generated snippet.
+
+### Behavior flags
+
+- `rewriteAsserts` (default `false`) — when `true`, sample bodies have their `assertPrints` / `assertTrue` /
+  `assertFalse` / `assertFails` / `assertFailsWith` calls rewritten into a commented `println`. Enable this only if your
+  samples use `kotlin.test` idioms.
+- `ignoreMissing` (default `false`) — strict by default. Unresolved `FUN`/`FUNS`, unclosed `//SampleStart`, and
+  non-function targets fail the task with a collected diagnostic list. Set `true` to degrade those errors to warnings
+  and keep the old snippet lines in the output.
+
+### Grouping samples
+
+Use `groupSamples` to wrap multiple related snippets (for example, HTML tabs). Semantics are unchanged from 0.1.x; only
+the property API moved from `= ...` to `.set(...)`.
+
+```kotlin
 korro {
-  groupSamples {
-
-    beforeSample = "<tab title=\"NAME\">\n"
-    afterSample = "\n</tab>"
-
-    funSuffix("_v1") {
-      replaceText("NAME", "Version 1")
+    groupSamples {
+        beforeGroup.set("<tabs>\n")
+        afterGroup.set("</tabs>")
+        beforeSample.set("<tab title=\"NAME\">\n")
+        afterSample.set("\n</tab>")
+        funSuffix("_v1") { replaceText("NAME", "Version 1") }
+        funSuffix("_v2") { replaceText("NAME", "Version 2") }
     }
-    funSuffix("_v2") {
-      replaceText("NAME", "Version 2")
-    }
-    beforeGroup = "<tabs>\n"
-    afterGroup = "</tabs>"
-  }
 }
 ```
 
-## Docs
-### Directives
+For new docs, prefer a single `FUNS myFun_v*` directive over two `FUN myFun_v1` / `FUN myFun_v2` directives.
 
-Korro does not parse the document and only recognizes _directives_.
-Directives must always start at the beginning of a line, start with
-```
-<!---
-```
-and end with
+## Directives
+
+Korro does not parse markdown; it recognizes _directives_ only. A directive:
+
+- starts at column 0 after `String.trim()`,
+- opens with **four dashes** `<!---` (standard HTML comments `<!--` are deliberately not recognized),
+- closes with `-->` on the **same line** (multi-line directives are an error),
+- has a name matching `[_a-zA-Z.]+`.
+
+### IMPORT
 
 ```
--->
-```
-There are also two types of directives that require and don't require the `END` closing directive.
-
-#### IMPORT
-The `IMPORT` directive is used to import a class containing test functions.
-```
-<!---IMPORT org.example.Test-->
-```
-Multiple imports can be specified in the documentation file.
-
-_**Note**_:
-
-_Import will not include the entire package, that is, such a path is not recognized - `org.example.*`._
-
-_You can specify the same classes._
-```
-<!---IMPORT org.example.test.Test-->
-<!---IMPORT org.example.test2.Test-->
+<!---IMPORT samples.Test-->
 ```
 
-_If two classes contain the same function names, then the function will be taken from the first imported class._
+Pushes `"samples.Test."` onto the prefix list used by subsequent `FUN`/`FUNS` lookups. Multiple `IMPORT`s are allowed;
+when more than one prefix resolves a short name, the **first** import wins.
 
-#### FUN
+Package wildcards (`samples.*`) are not supported.
 
-FUN directive is used to insert code into documentation:
+### FUN
+
 ```
-<!---FUN fully qualified name -->
+<!---FUN exampleTest-->
 <!---END-->
 ```
-Code will be inserted between these two directives.
 
-Only the part between the two comments `// SampleStart`, `// SampleEnd` will be taken from the test function:
-```kotlin
-fun test() {
-    ...
-    // SampleStart
-    sample code
-    // SampleEnd
-    ...
-}
+Inserts the body of the referenced Kotlin function between the directives, wrapped in a ```` ```kotlin ```` fence.
+
+If the function contains `//SampleStart` / `//SampleEnd` comments, only the region between them is emitted; multiple
+pairs are concatenated, separated by a blank line. If the function has no markers, the whole body is emitted (without
+the outer `{ }`).
+
+Only `fun` declarations (`KtNamedFunction`) are valid targets. Properties, classes, top-level expressions, and `.kts`
+scripts are not. Don't wrap function names in backticks.
+
+### FUNS
+
+```
+<!---FUNS sample_v*-->
+<!---END-->
 ```
 
-_**Note**_:
+Expands to every function matching the Ant-style glob (`*`, `?`) over the fully-qualified names reachable from the
+current `IMPORT` prefixes. Matches are emitted in deterministic order: first by containing file path, then by source
+offset.
 
-_Do not use function names with spaces enclosed in backticks_
+When `groupSamples.beforeGroup` / `afterGroup` are set and there are two or more matches, the whole group is wrapped by
+those strings; each individual match is wrapped by `beforeSample` / `afterSample`.
 
-#### FUNS
+Zero matches: fails the task in strict mode, or warns under `ignoreMissing`.
 
-#### END
+### END
 
-The `END` directive is the closing directive for `FUN` and `FUNS`.
+Closes `FUN` or `FUNS`.
 
-## Sample
+## Example
 
-`build.gradle`
-```groovy
+Minimal end-to-end setup (lifted from `integration-tests/fixtures/basic/`):
+
+`settings.gradle.kts`:
+
+```kotlin
+rootProject.name = "korro-example"
+```
+
+`build.gradle.kts`:
+
+```kotlin
 plugins {
-    id("io.github.devcrocod.korro") version "0.0.3"
+    id("io.github.devcrocod.korro") version "0.2.0"
 }
 
-...
+repositories {
+    mavenCentral()
+    maven("https://cache-redirector.jetbrains.com/intellij-dependencies")
+}
 
 korro {
-    docs = fileTree(project.rootDir) {
-        include 'docs/doc.md'
+    docs {
+        from(fileTree("docs"))
+        baseDir.set(layout.projectDirectory.dir("docs"))
     }
-
-    samples = fileTree(project.rootDir) {
-        include 'src/test/samples/test.kt'
+    samples {
+        from(fileTree("samples"))
     }
 }
 ```
 
-`test.kt`
+`samples/Example.kt`:
+
 ```kotlin
 package samples
 
-import org.junit.Test
-import org.junit.Assert.assertEquals
-
-class Test {
-    
-    @Test
-    fun exampleTest() {
-        val a = 1
-        val b = 2
-        val c: Int
-        // SampleStart
-        c = a + b
-        // SampleEnd
-        assertEquals(3, c)
-    }
+fun example() {
+    //SampleStart
+    println("hello")
+    //SampleEnd
 }
 ```
 
-`doc.md`
-```
-# Docs
-<!---IMPORT samples.Test-->
+`docs/foo.md` (before `korro`):
 
-Some text.
+```markdown
+# Example
 
-Example:
-<!---FUN exampleTest-->
+<!---IMPORT samples-->
+
+<!---FUN example-->
 <!---END-->
-
-Some text.
-
 ```
 
-After you run `korro` you get the following file `doc.md`:
-```
-# Docs
-<!---IMPORT samples.Test-->
+After `./gradlew korro korroApply`:
 
-Some text.
+````markdown
+# Example
 
-Example:
-<!---FUN exampleTest-->
+<!---IMPORT samples-->
+
+<!---FUN example-->
+
 ```kotlin
-c = a + b
-``'
-<!---END-->
-
-Some text.
-
+println("hello")
 ```
+
+<!---END-->
+````
+
+## What changed in 0.2
+
+- The analysis backend moved from Dokka 1.x (K1) to the Kotlin Analysis API (K2, standalone mode).
+- The DSL is now nested and Property-based (config-cache safe). `docs = …` / `samples = …` became
+  `docs { from(…); baseDir.set(…) }` / `samples { from(…); outputs.from(…) }`.
+- `korro` is cacheable and writes out-of-place to `build/korro/docs/`. Use the new `korroApply` to propagate into the
+  source tree and `korroCheck` in CI.
+- Strict-by-default: unresolved `FUN`/`FUNS` fails the build. Opt back in to the old warn-and-continue behavior with
+  `behavior { ignoreMissing.set(true) }`.
+- Assert rewriting is off by default. Restore with `behavior { rewriteAsserts.set(true) }`.
+- `FUNS` is now implemented as a glob-filter directive.
+- `korroClean` is removed; `korroTest` is deferred.
+
+Full upgrade guide: [MIGRATION.md](MIGRATION.md).
+
+A ready-to-copy consumer project lives at [`integration-tests/fixtures/basic/`](integration-tests/fixtures/basic).

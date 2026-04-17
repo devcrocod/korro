@@ -5,14 +5,7 @@ import com.intellij.psi.PsiElementVisitor
 import com.intellij.psi.PsiWhiteSpace
 import com.intellij.psi.impl.source.tree.LeafPsiElement
 import com.intellij.psi.util.PsiTreeUtil
-import org.jetbrains.kotlin.psi.KtBlockExpression
-import org.jetbrains.kotlin.psi.KtCallExpression
-import org.jetbrains.kotlin.psi.KtDeclarationWithBody
-import org.jetbrains.kotlin.psi.KtLambdaExpression
-import org.jetbrains.kotlin.psi.KtNamedFunction
-import org.jetbrains.kotlin.psi.KtStringTemplateExpression
-import org.jetbrains.kotlin.psi.KtTreeVisitorVoid
-import org.jetbrains.kotlin.psi.KtValueArgument
+import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.prevLeaf
 
 class SampleExtractor(private val rewriteAsserts: Boolean) {
@@ -25,7 +18,7 @@ class SampleExtractor(private val rewriteAsserts: Boolean) {
     private fun processBody(psiElement: PsiElement): String {
         val text = processSampleBody(psiElement).trim { it == '\n' || it == '\r' }.trimEnd()
         val lines = text.split("\n")
-        val indent = lines.filter(String::isNotBlank).map { it.takeWhile(Char::isWhitespace).count() }.minOrNull() ?: 0
+        val indent = lines.filter(String::isNotBlank).minOfOrNull { it.takeWhile(Char::isWhitespace).count() } ?: 0
         return lines.joinToString("\n") { it.drop(indent) }
     }
 
@@ -38,6 +31,7 @@ class SampleExtractor(private val rewriteAsserts: Boolean) {
                 else -> bodyExpressionText
             }
         }
+
         else -> psiElement.buildSampleText()
     }
 
@@ -72,8 +66,8 @@ class SampleExtractor(private val rewriteAsserts: Boolean) {
         private fun convertAssertTrueFalse(expression: KtCallExpression, expectedResult: Boolean) {
             val (argument) = expression.valueArguments
             builder.apply {
-                expression.valueArguments.getOrNull(1)?.let {
-                    append("// ${it.extractStringArgumentValue()}")
+                expression.valueArguments.getOrNull(1)?.let { value ->
+                    append("// ${value.extractStringArgumentValue()}")
                     val ws = expression.prevLeaf { it is PsiWhiteSpace }
                     append(ws?.text ?: "\n")
                 }
@@ -133,11 +127,25 @@ class SampleExtractor(private val rewriteAsserts: Boolean) {
         override fun visitCallExpression(expression: KtCallExpression) {
             if (rewriteAsserts) {
                 when (expression.calleeExpression?.text) {
-                    "assertPrints" -> { convertAssertPrints(expression); return }
-                    "assertTrue" -> { convertAssertTrueFalse(expression, expectedResult = true); return }
-                    "assertFalse" -> { convertAssertTrueFalse(expression, expectedResult = false); return }
-                    "assertFails" -> { convertAssertFails(expression); return }
-                    "assertFailsWith" -> { convertAssertFailsWith(expression); return }
+                    "assertPrints" -> {
+                        convertAssertPrints(expression); return
+                    }
+
+                    "assertTrue" -> {
+                        convertAssertTrueFalse(expression, expectedResult = true); return
+                    }
+
+                    "assertFalse" -> {
+                        convertAssertTrueFalse(expression, expectedResult = false); return
+                    }
+
+                    "assertFails" -> {
+                        convertAssertFails(expression); return
+                    }
+
+                    "assertFailsWith" -> {
+                        convertAssertFailsWith(expression); return
+                    }
                 }
             }
             super.visitCallExpression(expression)
@@ -155,7 +163,7 @@ class SampleExtractor(private val rewriteAsserts: Boolean) {
                 override fun visitElement(element: PsiElement) {
                     try {
                         element.accept(this@SampleBuilder)
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         builder.append(element.text)
                     }
                 }

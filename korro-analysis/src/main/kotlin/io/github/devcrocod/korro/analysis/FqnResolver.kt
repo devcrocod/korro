@@ -53,11 +53,13 @@ class FqnResolver(session: KorroAnalysisSession) {
         val target = bareName.substringAfterLast('.')
         if (target.isEmpty()) return emptyList()
         return byShortName.keys
+            .asSequence()
             .map { it to levenshtein(it, target) }
             .filter { it.second <= (target.length / 2).coerceAtLeast(2) }
             .sortedWith(compareBy({ it.second }, { it.first }))
             .take(limit)
             .map { it.first }
+            .toList()
     }
 
     private fun collectFunctions(
@@ -77,6 +79,7 @@ class FqnResolver(session: KorroAnalysisSession) {
                         }
                         decl.name?.let { shortName.getOrPut(it) { mutableListOf() }.add(decl) }
                     }
+
                     is KtClassOrObject -> visit(decl.declarations)
                     else -> {}
                 }

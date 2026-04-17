@@ -130,11 +130,11 @@ class KorroIntegrationTest {
         System.getProperty("korro.fixtures.dir")?.let { return File(it).toPath() }
 
         val cwd = File("").absoluteFile.toPath()
-        val candidates = listOf(
+        val candidates = listOfNotNull(
             cwd.resolve("fixtures"),
             cwd.resolve("integration-tests/fixtures"),
             cwd.parent?.resolve("fixtures"),
-        ).filterNotNull()
+        )
         return candidates.firstOrNull { Files.isDirectory(it) }
             ?: error(
                 "Cannot locate integration-tests/fixtures. " +
@@ -165,11 +165,11 @@ class KorroIntegrationTest {
 
     private fun findPluginShadowJar(): File? {
         val cwd = File("").absoluteFile
-        val candidates = listOf(
+        val candidates = listOfNotNull(
             cwd.resolve("../korro-gradle-plugin/build/libs"),
             cwd.resolve("korro-gradle-plugin/build/libs"),
             cwd.parentFile?.resolve("korro-gradle-plugin/build/libs"),
-        ).filterNotNull().filter { it.isDirectory }
+        ).filter { it.isDirectory }
         return candidates.asSequence()
             .flatMap { (it.listFiles { _, name -> name.endsWith(".jar") } ?: emptyArray<File>()).asSequence() }
             .filterNot { it.name.contains("-sources") || it.name.contains("-javadoc") }

@@ -34,8 +34,8 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
         return functionNames.firstNotNullOfOrNull { name ->
             var text = samplesTransformer(name) ?: groups.firstNotNullOfOrNull { group ->
                 group.patterns.mapNotNull { pattern ->
-                    samplesTransformer(name + pattern.nameSuffix)?.let {
-                        group.beforeSample?.let { pattern.processSubstitutions(it) } + it +
+                    samplesTransformer(name + pattern.nameSuffix)?.let { sampleText ->
+                        group.beforeSample?.let { pattern.processSubstitutions(it) } + sampleText +
                                 group.afterSample?.let { pattern.processSubstitutions(it) }
                     }
                 }.takeIf { it.isNotEmpty() }?.joinToString(
@@ -84,13 +84,13 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
         val body = when {
             hasWrapping && trimmed.size >= 2 -> trimmed.joinToString(
                 separator = "\n",
-                prefix = group!!.beforeGroup.orEmpty(),
+                prefix = group.beforeGroup.orEmpty(),
                 postfix = group.afterGroup.orEmpty(),
             ) { rs -> group.beforeSample.orEmpty() + rs.snippet + group.afterSample.orEmpty() }
 
             hasWrapping -> {
                 val rs = trimmed.single()
-                group!!.beforeSample.orEmpty() + rs.snippet + group.afterSample.orEmpty()
+                group.beforeSample.orEmpty() + rs.snippet + group.afterSample.orEmpty()
             }
 
             else -> trimmed.joinToString(separator = "\n\n") { it.snippet }
@@ -124,10 +124,7 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
         val old = ArrayList<String>()
         var n = startLineNo
         while (true) {
-            val sampleLine = reader.readLine()
-            if (sampleLine == null) {
-                return BlockCollect(old, null, null, unclosed = true) to n
-            }
+            val sampleLine = reader.readLine() ?: return BlockCollect(old, null, null, unclosed = true) to n
             n++
             val nextDirective = parseDirective(sampleLine)
             when (nextDirective?.name) {
@@ -135,9 +132,11 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
                     old.add(sampleLine)
                     return BlockCollect(old, nextDirective, sampleLine, unclosed = false) to n
                 }
+
                 FUN_DIRECTIVE, FUNS_DIRECTIVE -> {
                     return BlockCollect(old, nextDirective, sampleLine, unclosed = true) to n
                 }
+
                 else -> old.add(sampleLine)
             }
         }
@@ -170,7 +169,8 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
             lines.add(line)
 
             when (directive?.name) {
-                null, END_DIRECTIVE -> { /* no-op */ }
+                null, END_DIRECTIVE -> { /* no-op */
+                }
 
                 IMPORT_DIRECTIVE -> imports.add(directive.value + ".")
 
