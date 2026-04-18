@@ -6,6 +6,7 @@ pluginPublish = "2.1.1"
 kotlinxSerialization = "1.11.0"
 caffeine = "3.2.3"
 junit = "5.14.3"
+mavenPublish = "0.36.0"
 
 [libraries]
 kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
@@ -30,3 +31,4 @@ junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
 pluginPublish = { id = "com.gradle.plugin-publish", version.ref = "pluginPublish" }
+mavenPublish = { id = "com.vanniktech.maven.publish.base", version.ref = "mavenPublish" }

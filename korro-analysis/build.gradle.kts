@@ -1,7 +1,7 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.shadow)
-    `maven-publish`
+    alias(libs.plugins.mavenPublish)
 }
 
 repositories {
@@ -50,13 +50,64 @@ tasks.jar {
     dependsOn("shadowJar")
 }
 
+val sourcesJar by tasks.registering(Jar::class) {
+    archiveClassifier.set("sources")
+    from(sourceSets.main.get().allSource)
+}
+
+val emptyJavadocJar by tasks.registering(Jar::class) {
+    archiveClassifier.set("javadoc")
+}
+
 publishing {
     publications {
         create<MavenPublication>("maven") {
             artifact(tasks.shadowJar)
+            artifact(sourcesJar)
+            artifact(emptyJavadocJar)
             groupId = project.group.toString()
             artifactId = "korro-analysis"
             version = project.version.toString()
+        }
+    }
+}
+
+val signingEnabled = providers.gradleProperty("signingInMemoryKey").isPresent ||
+    providers.gradleProperty("signing.keyId").isPresent
+
+mavenPublishing {
+    publishToMavenCentral(automaticRelease = true)
+    if (signingEnabled) {
+        signAllPublications()
+    }
+
+    coordinates(project.group.toString(), "korro-analysis", project.version.toString())
+
+    pom {
+        name.set("Korro Analysis")
+        description.set(
+            "Kotlin Analysis API (K2 standalone) backend for Korro"
+        )
+        inceptionYear.set("2021")
+        url.set("https://github.com/devcrocod/korro")
+        licenses {
+            license {
+                name.set("The Apache License, Version 2.0")
+                url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+                distribution.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+            }
+        }
+        developers {
+            developer {
+                id.set("devcrocod")
+                name.set("Pavel Gorgulov")
+                url.set("https://github.com/devcrocod")
+            }
+        }
+        scm {
+            url.set("https://github.com/devcrocod/korro")
+            connection.set("scm:git:git://github.com/devcrocod/korro.git")
+            developerConnection.set("scm:git:ssh://git@github.com/devcrocod/korro.git")
         }
     }
 }

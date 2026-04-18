@@ -2,7 +2,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     `java-gradle-plugin`
     alias(libs.plugins.pluginPublish)
-    `maven-publish`
+    alias(libs.plugins.mavenPublish)
     alias(libs.plugins.shadow)
 }
 
@@ -62,6 +62,46 @@ gradlePlugin {
             displayName = "Korro documentation plugin"
             description = "Inserts snippets code of Kotlin into markdown documents from source example files and tests."
             tags.set(listOf("kotlin", "documentation", "markdown"))
+        }
+    }
+}
+
+val signingEnabled = providers.gradleProperty("signingInMemoryKey").isPresent ||
+    providers.gradleProperty("signing.keyId").isPresent
+
+mavenPublishing {
+    publishToMavenCentral(automaticRelease = true)
+    if (signingEnabled) {
+        signAllPublications()
+    }
+
+    coordinates(project.group.toString(), "korro-gradle-plugin", project.version.toString())
+
+    pom {
+        name.set("Korro Gradle Plugin")
+        description.set(
+            "Gradle plugin that injects Kotlin sample snippets into documentation"
+        )
+        inceptionYear.set("2021")
+        url.set("https://github.com/devcrocod/korro")
+        licenses {
+            license {
+                name.set("The Apache License, Version 2.0")
+                url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+                distribution.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+            }
+        }
+        developers {
+            developer {
+                id.set("devcrocod")
+                name.set("Pavel Gorgulov")
+                url.set("https://github.com/devcrocod")
+            }
+        }
+        scm {
+            url.set("https://github.com/devcrocod/korro")
+            connection.set("scm:git:git://github.com/devcrocod/korro.git")
+            developerConnection.set("scm:git:ssh://git@github.com/devcrocod/korro.git")
         }
     }
 }

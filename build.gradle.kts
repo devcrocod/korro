@@ -4,6 +4,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.mavenPublish) apply false
 }
 
 group = "io.github.devcrocod"
@@ -14,8 +15,8 @@ fun detectVersion(): String {
     val baseVersion = version as String
     return when {
         hasProperty("release") -> baseVersion
-        buildNumber != null    -> "$baseVersion-dev-$buildNumber"
-        else                   -> "$baseVersion-dev"
+        buildNumber != null -> "$baseVersion-dev-$buildNumber"
+        else -> "$baseVersion-dev"
     }
 }
 
