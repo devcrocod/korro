@@ -45,7 +45,7 @@ class KorroPlugin : Plugin<Project> {
             }
 
             tasks.register("korroCheck", KorroCheckTask::class.java) { t ->
-                t.description = "Verifies generated docs match source tree (stub; full implementation pending)."
+                t.description = "Verifies generated docs match the source tree (fails on diff)."
                 t.group = "verification"
                 t.docs.from(ext.docs.from)
                 t.docsBaseDir.set(ext.docs.baseDir)
@@ -60,6 +60,7 @@ class KorroPlugin : Plugin<Project> {
                 t.groupSamples.patterns.set(ext.groupSamples.patterns)
                 t.korroRuntimeClasspath.from(runtime)
                 t.korroPluginVersion.set(korroPluginVersion)
+                t.generatedDirectory.set(layout.buildDirectory.dir("korro/check"))
                 t.reportFile.set(layout.buildDirectory.file("korro/check.report"))
             }
         }

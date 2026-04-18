@@ -6,12 +6,6 @@ const val IMPORT_DIRECTIVE = "IMPORT"
 const val FUN_DIRECTIVE = "FUN"
 const val FUNS_DIRECTIVE = "FUNS"
 const val END_DIRECTIVE = "END"
-const val EOF = "\u001a"
-
-// Legacy HTML-comment style (backwards compatible; kept as public constants).
-const val DIRECTIVE_START = "<!---"
-const val DIRECTIVE_END = "-->"
-const val END_SAMPLE = DIRECTIVE_START + END_DIRECTIVE + DIRECTIVE_END
 
 /**
  * Marker syntax used to wrap a Korro directive on a single line.
@@ -23,7 +17,7 @@ const val END_SAMPLE = DIRECTIVE_START + END_DIRECTIVE + DIRECTIVE_END
  * asymmetry so the directive signature is visually consistent across file types.
  */
 enum class DirectiveSyntax(val start: String, val end: String) {
-    HTML(DIRECTIVE_START, DIRECTIVE_END),
+    HTML("<!---", "-->"),
     MDX("{/*---", "--*/}"),
     ;
 
@@ -42,8 +36,6 @@ enum class DirectiveSyntax(val start: String, val end: String) {
         }
     }
 }
-
-val DIRECTIVE_REGEX: Regex = DirectiveSyntax.HTML.regex
 
 fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
     logger.info("*** Reading $inputFile")
@@ -68,7 +60,7 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
                 group.patterns.mapNotNull { pattern ->
                     samplesTransformer(name + pattern.nameSuffix)?.let { sampleText ->
                         group.beforeSample?.let { pattern.processSubstitutions(it) } + sampleText +
-                                group.afterSample?.let { pattern.processSubstitutions(it) }
+                            group.afterSample?.let { pattern.processSubstitutions(it) }
                     }
                 }.takeIf { it.isNotEmpty() }?.joinToString(
                     separator = "\n",
@@ -109,9 +101,9 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
 
         val group = groups.firstOrNull()
         val hasWrapping = group != null && (
-                !group.beforeGroup.isNullOrEmpty() || !group.afterGroup.isNullOrEmpty() ||
-                        !group.beforeSample.isNullOrEmpty() || !group.afterSample.isNullOrEmpty()
-                )
+            !group.beforeGroup.isNullOrEmpty() || !group.afterGroup.isNullOrEmpty() ||
+                !group.beforeSample.isNullOrEmpty() || !group.afterSample.isNullOrEmpty()
+            )
 
         val body = when {
             hasWrapping && trimmed.size >= 2 -> trimmed.joinToString(

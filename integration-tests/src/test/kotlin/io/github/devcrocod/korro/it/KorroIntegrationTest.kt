@@ -95,6 +95,66 @@ class KorroIntegrationTest {
         )
     }
 
+    @Test
+    fun korroCheckPassesWhenUpToDate(@TempDir tempDir: Path) {
+        val fixture = loadFixture("checkOk", tempDir)
+
+        val runner = GradleRunner.create()
+            .withProjectDir(fixture.toFile())
+            .withArguments("korroCheck", "--stacktrace")
+            .forwardOutput()
+
+        configurePluginClasspath(runner)
+        System.getProperty("korro.testkit.gradleVersion")
+            ?.takeIf { it.isNotBlank() }
+            ?.let(runner::withGradleVersion)
+
+        val result = runner.build()
+
+        assertEquals(
+            TaskOutcome.SUCCESS,
+            result.task(":korroCheck")?.outcome,
+            "korroCheck should succeed when docs are up to date",
+        )
+        val report = fixture.resolve("build/korro/check.report")
+        assertTrue(Files.exists(report)) { "korroCheck did not produce $report" }
+        assertTrue(report.readText().contains("OK")) {
+            "Expected OK report, got:\n${report.readText()}"
+        }
+    }
+
+    @Test
+    fun korroCheckFailsWhenOutOfDate(@TempDir tempDir: Path) {
+        val fixture = loadFixture("basic", tempDir)
+
+        val runner = GradleRunner.create()
+            .withProjectDir(fixture.toFile())
+            .withArguments("korroCheck", "--stacktrace")
+            .forwardOutput()
+
+        configurePluginClasspath(runner)
+        System.getProperty("korro.testkit.gradleVersion")
+            ?.takeIf { it.isNotBlank() }
+            ?.let(runner::withGradleVersion)
+
+        val result = runner.buildAndFail()
+
+        assertEquals(
+            TaskOutcome.FAILED,
+            result.task(":korroCheck")?.outcome,
+            "korroCheck should fail when docs differ from regeneration",
+        )
+        val output = result.output
+        assertTrue(output.contains("foo.md")) {
+            "Expected failure output to name the out-of-date file; got:\n$output"
+        }
+        assertTrue(output.contains("out of date")) {
+            "Expected 'out of date' in the diff report; got:\n$output"
+        }
+        val report = fixture.resolve("build/korro/check.report")
+        assertTrue(Files.exists(report)) { "korroCheck did not produce $report" }
+    }
+
     private fun runFixture(
         name: String,
         tempDir: Path,
