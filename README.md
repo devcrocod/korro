@@ -7,9 +7,9 @@ Kotlin source code documentation plugin.
 
 Inspired by [kotlinx-knit](https://github.com/Kotlin/kotlinx-knit).
 
-Korro injects Kotlin sample snippets into markdown documents. You point it at some `.md` files and some Kotlin source
-files, mark regions with `<!---FUN ...-->` directives, and Korro fills those regions with the body of the referenced
-function.
+Korro injects Kotlin sample snippets into Markdown and MDX documents. You point it at some `.md`/`.mdx` files and some
+Kotlin source files, mark regions with `<!---FUN ...-->` directives (or `{/*---FUN ...--*/}` in MDX), and Korro fills
+those regions with the body of the referenced function.
 
 <!---TOC-->
 
@@ -76,7 +76,7 @@ Typical workflow:
 ```kotlin
 korro {
     docs {
-        from(fileTree("docs") { include("**/*.md") })
+        from(fileTree("docs") { include("**/*.md", "**/*.mdx") })
         baseDir.set(layout.projectDirectory.dir("docs"))   // REQUIRED
     }
     samples {
@@ -132,9 +132,21 @@ For new docs, prefer a single `FUNS myFun_v*` directive over two `FUN myFun_v1` 
 Korro does not parse markdown; it recognizes _directives_ only. A directive:
 
 - starts at column 0 after `String.trim()`,
-- opens with **four dashes** `<!---` (standard HTML comments `<!--` are deliberately not recognized),
-- closes with `-->` on the **same line** (multi-line directives are an error),
+- opens with three dashes after an HTML- or MDX-comment prefix — `<!---` for `.md` or `{/*---` for `.mdx` (standard HTML comments `<!--` and standard MDX comments `{/*` are deliberately not recognized),
+- closes on the **same line** with `-->` (in `.md`) or `--*/}` (in `.mdx`); multi-line directives are an error,
 - has a name matching `[_a-zA-Z.]+`.
+
+The syntax is selected per file by extension — `.mdx` uses the JSX-expression form, everything else uses the
+HTML-comment form. Both encode the same four directives (`IMPORT`, `FUN`, `FUNS`, `END`) with identical semantics;
+examples below show the `.md` form.
+
+MDX equivalents (for Mintlify, Docusaurus, etc.):
+
+```mdx
+{/*---IMPORT samples.Test--*/}
+{/*---FUN exampleTest--*/}
+{/*---END--*/}
+```
 
 ### IMPORT
 
@@ -266,6 +278,7 @@ println("hello")
   `behavior { ignoreMissing.set(true) }`.
 - Assert rewriting is off by default. Restore with `behavior { rewriteAsserts.set(true) }`.
 - `FUNS` is now implemented as a glob-filter directive.
+- MDX files (`.mdx`) are supported natively via a JSX-expression directive form `{/*---FUN ...--*/}`.
 - `korroClean` is removed; `korroTest` is deferred.
 
 Full upgrade guide: [MIGRATION.md](MIGRATION.md).

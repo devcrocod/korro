@@ -46,6 +46,16 @@ class KorroIntegrationTest {
     }
 
     @Test
+    fun mdxFixture(@TempDir tempDir: Path) {
+        runFixture(
+            name = "mdx",
+            tempDir = tempDir,
+            generatedRelativePath = "build/korro/docs/overview.mdx",
+            expectedRelativePath = "mdx/docs/expected/overview.mdx",
+        )
+    }
+
+    @Test
     fun strictModeFailsOnMissing(@TempDir tempDir: Path) {
         val fixture = loadFixture("strictErrors", tempDir)
 

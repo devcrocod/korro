@@ -2,21 +2,53 @@ package io.github.devcrocod.korro
 
 import java.io.File
 
-const val DIRECTIVE_START = "<!---"
-const val DIRECTIVE_END = "-->"
 const val IMPORT_DIRECTIVE = "IMPORT"
 const val FUN_DIRECTIVE = "FUN"
 const val FUNS_DIRECTIVE = "FUNS"
 const val END_DIRECTIVE = "END"
 const val EOF = "\u001a"
 
+// Legacy HTML-comment style (backwards compatible; kept as public constants).
+const val DIRECTIVE_START = "<!---"
+const val DIRECTIVE_END = "-->"
 const val END_SAMPLE = DIRECTIVE_START + END_DIRECTIVE + DIRECTIVE_END
 
-val DIRECTIVE_REGEX =
-    Regex("$DIRECTIVE_START\\s*([_a-zA-Z.]+)(?:\\s+(.+?(?=$DIRECTIVE_END|)))?(?:\\s*($DIRECTIVE_END))?\\s*")
+/**
+ * Marker syntax used to wrap a Korro directive on a single line.
+ *
+ * [HTML] matches Markdown's HTML-comment form `<!---NAME VALUE-->`.
+ * [MDX] matches an MDX JSX-expression comment form `{/*---NAME VALUE--*/}`;
+ * plain `<!-- -->` is rejected by MDX v2 parsers (e.g. Mintlify), so MDX docs
+ * must use this variant. Both forms share the same 3-dashes-to-open, 2-dashes-to-close
+ * asymmetry so the directive signature is visually consistent across file types.
+ */
+enum class DirectiveSyntax(val start: String, val end: String) {
+    HTML(DIRECTIVE_START, DIRECTIVE_END),
+    MDX("{/*---", "--*/}"),
+    ;
+
+    val endSample: String get() = "$start$END_DIRECTIVE$end"
+
+    val regex: Regex = run {
+        val s = Regex.escape(start)
+        val e = Regex.escape(end)
+        Regex("$s\\s*([_a-zA-Z.]+)(?:\\s+(.+?(?=$e|)))?(?:\\s*($e))?\\s*")
+    }
+
+    companion object {
+        fun forFile(file: File): DirectiveSyntax = when (file.extension.lowercase()) {
+            "mdx" -> MDX
+            else -> HTML
+        }
+    }
+}
+
+val DIRECTIVE_REGEX: Regex = DirectiveSyntax.HTML.regex
 
 fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
     logger.info("*** Reading $inputFile")
+    val syntax = DirectiveSyntax.forFile(inputFile)
+    val endSample = syntax.endSample
     val samplesTransformer = this.samplesTransformer
     val lines = ArrayList<String>()
     val imports = mutableListOf("")
@@ -48,7 +80,7 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
             if (text != null && output != null) {
                 text += output.readText()
             }
-            text?.split("\n")?.plus(END_SAMPLE)
+            text?.split("\n")?.plus(endSample)
         }
     }
 
@@ -95,7 +127,7 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
 
             else -> trimmed.joinToString(separator = "\n\n") { it.snippet }
         }
-        return ("\n" + body + "\n").split("\n") + END_SAMPLE
+        return ("\n" + body + "\n").split("\n") + endSample
     }
 
     fun processFuns(glob: String, oldSampleLines: List<String>, directiveLine: Int) {
@@ -126,7 +158,7 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
         while (true) {
             val sampleLine = reader.readLine() ?: return BlockCollect(old, null, null, unclosed = true) to n
             n++
-            val nextDirective = parseDirective(sampleLine)
+            val nextDirective = parseDirective(sampleLine, syntax)
             when (nextDirective?.name) {
                 END_DIRECTIVE -> {
                     old.add(sampleLine)
@@ -163,7 +195,7 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
                 val raw = reader.readLine() ?: break
                 lineNo++
                 line = raw
-                directive = parseDirective(raw)
+                directive = parseDirective(raw, syntax)
                 directiveLineNo = lineNo
             }
             lines.add(line)
@@ -199,7 +231,7 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
                 }
 
                 else -> logger.warn(
-                    "Unrecognized directive '${directive.name}' on a line starting with '$DIRECTIVE_START' in '$inputFile'"
+                    "Unrecognized directive '${directive.name}' on a line starting with '${syntax.start}' in '$inputFile'"
                 )
             }
         }
@@ -217,11 +249,11 @@ data class Directive(
     val value: String,
 )
 
-fun parseDirective(line: String): Directive? {
+fun parseDirective(line: String, syntax: DirectiveSyntax = DirectiveSyntax.HTML): Directive? {
     val trimLine = line.trim()
-    if (!trimLine.startsWith(DIRECTIVE_START)) return null
-    val match = DIRECTIVE_REGEX.matchEntire(trimLine) ?: return null
+    if (!trimLine.startsWith(syntax.start)) return null
+    val match = syntax.regex.matchEntire(trimLine) ?: return null
     val groups = match.groups.filterNotNull().toMutableList()
-    require(groups.last().value == DIRECTIVE_END) { "Directive must end on the same line with '$DIRECTIVE_END'" }
+    require(groups.last().value == syntax.end) { "Directive must end on the same line with '${syntax.end}'" }
     return Directive(groups[1].value.trim(), groups.getOrNull(2)?.value?.trim() ?: "")
 }

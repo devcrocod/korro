@@ -135,14 +135,22 @@ safe to run from CI without mutating the repo.
 
 All new diagnostics are collected across the whole run and reported as a single table at the end of the task.
 
-## Directive syntax — unchanged
+## Directive syntax — unchanged for `.md`, new MDX variant
 
-`<!---IMPORT ...-->`, `<!---FUN ...-->`, `<!---END-->` and the four-dash open marker all work exactly as in 0.1.x.
-Existing markdown files parse without modification. Two things worth knowing:
+`<!---IMPORT ...-->`, `<!---FUN ...-->`, `<!---END-->` and the three-dash open marker all work exactly as in 0.1.x.
+Existing markdown files parse without modification. Three things worth knowing:
 
 - The previously-reserved `<!---FUNS glob-->` directive is now live. See
   the [FUNS section of the README](README.md#funs).
 - First-import-wins on ambiguous short names is preserved.
+- `.mdx` files now have a dedicated directive form. MDX v2 parsers (Mintlify, Docusaurus) reject raw HTML comments, so
+  Korro recognizes a JSX-expression variant in files with the `.mdx` extension:
+  ```mdx
+  {/*---IMPORT samples--*/}
+  {/*---FUN exampleTest--*/}
+  {/*---END--*/}
+  ```
+  Same three directives, same semantics; only the outer marker changes. Selection is automatic by file extension.
 
 ## Consumer-project template
 
