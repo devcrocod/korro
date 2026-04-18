@@ -4,84 +4,64 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Korro is a Gradle plugin (Kotlin/JVM) that injects code snippets from Kotlin sample/test source files into Markdown docs. It is published on the Gradle Plugin Portal as `io.github.devcrocod.korro`. User-facing directive syntax and consumer configuration are documented in `README.md`; the 0.2.0 upgrade contract is in `SPEC.md` and the 0.1.x→0.2.0 migration in `MIGRATION.md` — read those before changing the directive parser or the extension DSL.
-
-The repository is a multi-module Gradle build:
-
-- `korro-gradle-plugin/` — thin plugin (published to the Gradle Plugin Portal). Only Gradle API + Kotlin stdlib at compile time. No Analysis API imports.
-- `korro-analysis/` — shadowed fat jar with the Kotlin Analysis API (K2 standalone mode), IntelliJ platform, and Korro's PSI-based snippet extraction. Published to Maven Central and pulled in at task-execution time through the `korroAnalysisRuntime` configuration.
-- `integration-tests/` — GradleTestKit + golden-file tests under `integration-tests/fixtures/`.
+Korro is a Gradle plugin (Kotlin/JVM), published as `io.github.devcrocod.korro`, that injects Kotlin function bodies into `.md`/`.mdx` docs via `<!---FUN ...-->` or `{/*---FUN ...--*/}` directives. Consumer-facing syntax and the DSL are in `README.md`; the 0.1.x→0.2.0 migration is in `MIGRATION.md`. **Read both before changing the directive parser or the extension DSL** — they are the downstream contract.
 
 ## Commands
 
-Build uses the Gradle wrapper (currently 9.4.1):
+Gradle wrapper (9.4.1):
 
 - `./gradlew build` — compile and assemble both modules.
-- `./gradlew :korro-analysis:shadowJar` — build only the shadowed analysis jar. In 0.2.0 the **plugin** module is thin; the **analysis** module is the fat one.
-- `./gradlew publishToMavenLocal` — install both artifacts to `~/.m2/repository` for local testing in a consumer project (the plugin's `korroAnalysisRuntime` looks up `korro-analysis` at its own version, so both must be installed together).
-- `./gradlew publishPlugins` — publish the plugin to the Gradle Plugin Portal (requires credentials).
-- `./gradlew -Prelease build` — produce a release-versioned artifact. Without `-Prelease`, `detectVersion()` in `build.gradle.kts` appends `-dev` (or `-dev-<build.number>`) to the version in `gradle.properties`.
-- `./gradlew :integration-tests:test` — run the GradleTestKit integration tests under `integration-tests/fixtures/*`.
+- `./gradlew :integration-tests:test` — GradleTestKit + golden-file tests under `integration-tests/fixtures/`. This is the only meaningful test suite in this repo.
+- `./gradlew publishToMavenLocal` — install **both** artifacts to `~/.m2/` for consumer testing. Both must be installed together: `korroAnalysisRuntime` resolves `korro-analysis` at the plugin's own version at task-execution time.
+- `./gradlew -Prelease build` — release-versioned artifact. Without `-Prelease`, `detectVersion()` in the root `build.gradle.kts` appends `-dev` (or `-dev-<build.number>`) to the version in `gradle.properties`.
+- `./gradlew :korro-analysis:shadowJar` — build only the fat jar.
+- `./gradlew publishPlugins` — publish to the Gradle Plugin Portal (requires credentials).
 
-The `korroGenerate` / `korro` / `korroCheck` tasks the plugin registers are only runnable from a *consumer* project that applies this plugin (or from one of the integration-test fixtures). They are not runnable from this repo's root.
-
-## Version wiring
-
-Korro's own version lives in `gradle.properties` as `version`. Both modules inherit it through `subprojects { version = rootProject.version }` in the root `build.gradle.kts`. At runtime the plugin reads this from a generated `META-INF/korro-gradle-plugin.properties` resource on the plugin classpath (see `KorroPlugin.readKorroPluginVersion`).
-
-All other versions live in the Gradle version catalog at `gradle/libs.versions.toml`. The catalog is the single source of truth — don't hard-code versions in subproject build scripts, add them to the catalog and reference as `libs.*` / `libs.plugins.*`. Key entries:
-
-- `kotlin` — the pinned Kotlin / Analysis API version used by `korro-analysis` and for the `kotlin("jvm")` plugin.
-- `kotlinLanguage` — sets both Kotlin `languageVersion` and `apiVersion` in the subproject Kotlin compilation. Read in the root `build.gradle.kts` via `libs.versions.kotlinLanguage.get()`. Unrelated to the pinned Analysis API version. JVM target is hard-coded to `17` in the root `build.gradle.kts`.
-- `shadow`, `pluginPublish` — Gradle plugin versions consumed via `alias(libs.plugins.*)`.
-- `kotlinxSerialization`, `caffeine`, `junit` — runtime/test library versions.
-
-A new cache key: every task has an `@Input korroPluginVersion` property, so cached outputs are invalidated on plugin bump (which is also a bundled Analysis API bump).
+The `korroGenerate` / `korro` / `korroCheck` tasks the plugin registers are **not** runnable from this repo's root — only from a consumer project or an `integration-tests/fixtures/*` fixture.
 
 ## Architecture
 
-Two layers separated by a worker boundary.
+Two modules separated by a Gradle worker boundary.
 
-**Gradle-facing layer** — `korro-gradle-plugin/`, runs in the Gradle daemon's classloader, no Analysis API imports.
+### `korro-gradle-plugin/` — Gradle-facing layer (thin)
 
-- `KorroPlugin` creates the `korro` extension, creates the detached `korroAnalysisRuntime` configuration (with a dependency on `io.github.devcrocod:korro-analysis:<pluginVersion>`), and in `afterEvaluate` registers three tasks: `korroGenerate`, `korro`, `korroCheck`. No `korroClean`.
-- `KorroExtension` (`KorroExtension.kt`) exposes the nested DSL: `docs { from(...); baseDir.set(...) }`, `samples { from(...); outputs.from(...) }`, `behavior { rewriteAsserts.set(...); ignoreMissing.set(...) }`, `groupSamples { ... }`. All properties use Gradle's `Property<T>` / `ConfigurableFileCollection` / `DirectoryProperty` for config-cache safety.
-- Tasks:
-  - `KorroGenerateTask` (registered as `korroGenerate`; `@CacheableTask`, extends `AbstractKorroTask`) — `@InputFiles docs`/`samples`/`samplesOutputs`, `@Input` flags, `@Classpath korroRuntimeClasspath`, `@OutputDirectory outputDirectory` (defaults to `build/korro/docs`). On `@TaskAction`, submits a `KorroWorkAction` via `WorkerExecutor.classLoaderIsolation { classpath.from(korroRuntimeClasspath) }`.
-  - `KorroTask` (registered as `korro`; `@DisableCachingByDefault`, extends `Copy`) — depends on `korroGenerate` and copies its output directory onto `docs.baseDir`. This is the only mutation point, and the default task users invoke. **Must be `Copy`, not `Sync`:** `docs.baseDir` is typically the project or repo root, which contains many files not managed by Korro (build scripts, sources, hidden dirs, untracked work). A `Sync` task deletes any file in the destination that isn't in the source — i.e. it would wipe the entire repo except the regenerated markdown tree.
-  - `KorroCheckTask` (`@CacheableTask`, extends `AbstractKorroTask`) — regenerates via the same `KorroWorkAction` into an internal directory (`build/korro/check`, `@Internal`), diffs each generated file against the corresponding source under `docs.baseDir`, writes a summary to `@OutputFile build/korro/check.report`, and throws a `GradleException` listing the first differing line per file when any mismatch is found. Strict-mode worker failures (unresolved `FUN`, etc.) propagate through `queue.await()` and also fail the task — intended CI behavior.
-- `AbstractKorroTask.buildDocsToOutputs(outDir)` computes each input doc's output path relative to `docs.baseDir` — fails loudly if an input is outside `baseDir`.
-- `Korro.kt` is the markdown rewriter (parser + state machine). It lives in the plugin module, not the analysis module — parsing `<!---…-->` doesn't need Analysis API, so the parser can run without spinning up a worker. The directive marker form is selected per-file by extension through the `DirectiveSyntax` enum: `.mdx` files use `{/*---…--*/}` (JSX-expression comments, required because Mintlify/Docusaurus reject raw HTML comments); everything else uses `<!---…-->`. Both forms share the same parser, grammar, regex shape (only the literal `start`/`end` differ), and `END_SAMPLE` is chosen to match the opening file's syntax.
+Runs in the Gradle daemon classloader. No Analysis API imports at compile time — only `compileOnly(gradleApi())` + `implementation(kotlin("stdlib"))`. Contains `KorroPlugin`, `KorroExtension`, the three tasks, and the markdown directive parser (`Korro.kt`).
 
-**Worker layer** — `korro-analysis/`, runs in a fresh classloader with the Analysis API, IntelliJ platform, and stdlib on the classpath.
+The parser lives here, not in `korro-analysis`, because `<!---…-->` / `{/*---…--*/}` parsing doesn't need the Analysis API. Per-file marker form is selected by extension through `DirectiveSyntax`: `.mdx` uses JSX-expression comments (required — Mintlify/Docusaurus reject raw HTML comments); everything else uses the HTML-comment form.
 
-- `KorroWorkAction` (`KorroAction.kt`) receives serialized `KorroWorkParameters` (docs→output map, sample files, sampleOutput files, `SamplesGroup` list, boolean flags, task name, plugin version), builds a `KorroContext`, and drives it.
-- `KorroContext` wires the markdown rewriter to a single `SamplesTransformer` constructed once per `execute()`.
-- `SamplesTransformer` / `FqnResolver` / `SampleExtractor` (in `korro-analysis/`) drive the K2 Analysis API. One `StandaloneAnalysisAPISession` per worker `execute()` (disposed in a `try/finally`). FQN resolution uses the two-tier strategy from SPEC §9.3: a fast-path short-name index over `KtNamedFunction`s, then a dummy-KDoc fallback for qualified / ambiguous names.
-- `Korro.kt` markdown rewriter behavior:
-  - `IMPORT` pushes a dotted prefix onto an `imports` list; `FUN` / `FUNS` are tried against each prefix until one resolves. First-import-wins on ambiguity.
-  - `FUN` opens a block; the loop consumes lines into `oldSampleLines` until `END`, EOF, or the next `FUN` / `FUNS`. On close, `processFun` asks `SamplesTransformer` for replacement text. File is rewritten only if any block changed (`rewrite` flag preserved).
-  - `FUNS` is fully implemented as an Ant-style glob over FQNs. `renderFunsBody(glob)` asks the transformer for all matches, emits them in deterministic order (file path, then source offset), and wraps the group with `groupSamples.beforeGroup`/`afterGroup` when 2+ matches exist.
-  - Unresolved `FUN` / `FUNS`, unclosed `//SampleStart`, and non-function targets are collected into a `DiagnosticList`. Under `behavior.ignoreMissing=false` (default) the task fails with a single `GradleException` containing the formatted table; under `ignoreMissing=true` everything degrades to `WARN` and the task succeeds with the old snippet lines retained.
-  - If a `samples.outputs` file named `<fqName>` exists, its contents are appended to the generated snippet.
-- Sample extraction (from SPEC §9.4):
-  - Markers are detected by trimming comment text — `//SampleStart`, `// SampleStart`, and `/* SampleStart */` all match. Marker comments never appear in the output.
-  - Multiple `//SampleStart`/`//SampleEnd` pairs in one function are concatenated in source order, separated by a blank line.
-  - Zero markers → emit the whole body (minus the outer `{ }`).
-  - Unclosed `//SampleStart` → diagnostic.
-  - Assert-rewriting (`assertPrints`, `assertTrue`, `assertFalse`, `assertFails`, `assertFailsWith` → commented `println`) runs only when `behavior.rewriteAsserts=true`.
-  - Output is wrapped in a ```` ```kotlin ```` fence.
+Analysis code is pulled in at task-execution time: `KorroPlugin` creates a detached `korroAnalysisRuntime` configuration with a dependency on `io.github.devcrocod:korro-analysis:<pluginVersion>`, and tasks submit work via `WorkerExecutor.classLoaderIsolation { classpath.from(korroRuntimeClasspath) }`.
 
-## Packaging detail
+**Task shape to preserve:**
 
-- `korro-gradle-plugin` has minimal runtime dependencies — `compileOnly(gradleApi())`, `implementation(kotlin("stdlib"))`, and an `implementation` edge on `korro-analysis` that is *not* on the plugin's runtime classpath (the consumer resolves `korro-analysis` at task-execution time via the `korroAnalysisRuntime` configuration). This keeps the plugin jar on the Gradle Portal small and avoids classpath conflicts with other Kotlin-compiler-based plugins the consumer might apply.
-- `korro-analysis` is the fat/shaded jar, built via the Shadow plugin. It bundles the Analysis API, low-level FIR, and the IntelliJ platform bits needed by standalone mode. `com.intellij.*` and `org.jetbrains.kotlin.*` are left unrelocated intentionally (the Analysis API is already uniquely namespaced under those packages).
+- `korroGenerate` (`@CacheableTask`) writes out-of-place to `build/korro/docs/`.
+- `korro` extends `Copy` (never `Sync`), depends on `korroGenerate`, and copies its output onto `docs.baseDir`. This is the only source-mutation point. **Must stay `Copy`:** `docs.baseDir` is typically the repo or project root and contains many files Korro does not manage — `Sync`'s delete-unknown semantics would wipe the working tree.
+- `korroCheck` (`@CacheableTask`) regenerates into `build/korro/check/`, diffs against the source tree, and fails the build with the first differing line per file. CI entry point.
+- Every task has an `@Input korroPluginVersion` so cached outputs invalidate on plugin bump (which is also the Analysis API bump).
 
-## Consumer-project behavior to preserve when refactoring
+### `korro-analysis/` — Analysis layer (shadowed fat jar)
 
-- Directive lines must start at column 0 after `trim()`; `parseDirective` returns `null` otherwise.
-- When multiple `IMPORT`s resolve the same short name, the **first** one wins (`firstNotNullOfOrNull` over `imports`).
-- The directive regex only allows `[_a-zA-Z.]+` for the directive name — changing it affects parsing of every consumer's docs.
-- Two directive forms are supported and selected per-file by extension: `<!---NAME VALUE-->` for `.md` (and anything not `.mdx`), `{/*---NAME VALUE--*/}` for `.mdx`. Both preserve the 3-dashes-to-open / 2-dashes-to-close asymmetry, so the directive has the same visual signature in either file type. Do **not** collapse to two open dashes (that's a standard HTML comment or a standard MDX comment — consumer docs rely on the distinction).
-- `FUN`/`FUNS` targets must be `KtNamedFunction`s. Properties, classes, top-level expressions, and `.kts` scripts produce a diagnostic, not a silent empty snippet.
-- `behavior.ignoreMissing=false` is the strict-by-default contract. Don't silently lower severity on unresolved references without an opt-in.
+Runs inside the worker's isolated classloader. Bundles the Kotlin Analysis API (K2 standalone), low-level FIR, and the IntelliJ platform. `com.intellij.*` and `org.jetbrains.kotlin.*` are **intentionally unrelocated** — the Analysis API is already uniquely namespaced, and relocating it breaks reflection lookups inside the platform.
+
+- One `StandaloneAnalysisAPISession` per `KorroWorkAction.execute()` call, disposed in a `try/finally`. Do **not** call `disposeGlobalStandaloneApplicationServices()` — it's a one-shot that invalidates all future Analysis API use in the JVM. `classLoaderIsolation` gives a fresh classloader per task run, so singletons are reloaded naturally.
+- FQN resolution is two-tier: a fast-path short-name index over `KtNamedFunction`s for unambiguous bare names, then a dummy-KDoc `/** [fqn] */` fallback for qualified/ambiguous names. First-import-wins on ambiguity.
+
+### Worker boundary
+
+`KorroWorkParameters` is serialized across the classloader boundary (even under `classLoaderIsolation`, Gradle serializes parameters). All fields must stay `Serializable` — `Set<File>`, primitives, strings, and the `SamplesGroup` DTO only. No `Project` / `Task` / `Logger` references.
+
+## Version wiring
+
+- Korro's own version lives in `gradle.properties` (`version=...`). Both subprojects inherit it via `subprojects { version = rootProject.version }` in the root `build.gradle.kts`. At runtime the plugin reads it from a generated `META-INF/korro-gradle-plugin.properties` resource (`KorroPlugin.readKorroPluginVersion`).
+- Every other version lives in `gradle/libs.versions.toml`. The catalog is the single source of truth — do not hard-code versions in subproject scripts; add to the catalog and reference as `libs.*` / `libs.plugins.*`.
+- `libs.versions.kotlin` — pinned Kotlin / Analysis API version. `libs.versions.kotlinLanguage` — Kotlin `languageVersion`/`apiVersion` used to compile Korro itself; unrelated to the bundled Analysis API. JVM target is hard-coded to `17` in the root `build.gradle.kts`.
+
+## Invariants to preserve
+
+These are contracts for every consumer's docs; breaking any of them silently breaks downstream projects.
+
+- **Directives start at column 0 after `String.trim()`.** `parseDirective` returns `null` otherwise.
+- **Three dashes to open, two to close.** `<!---NAME VALUE-->` for `.md` (and anything non-`.mdx`); `{/*---NAME VALUE--*/}` for `.mdx`. Do not collapse the open marker to two dashes — that becomes a standard HTML/MDX comment, and consumer docs rely on the distinction.
+- **Directive name regex is `[_a-zA-Z.]+`.** Broadening it changes parsing for every consumer.
+- **First `IMPORT` wins** on ambiguous short names (`firstNotNullOfOrNull` over the `imports` list).
+- **Only `KtNamedFunction`** is a valid `FUN`/`FUNS` target. Properties, classes, top-level expressions, and `.kts` scripts must produce a diagnostic, not a silent empty snippet.
+- **`behavior.ignoreMissing=false` is the strict-by-default contract.** Don't silently lower severity on unresolved references without an explicit opt-in.
