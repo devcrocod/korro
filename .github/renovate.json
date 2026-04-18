@@ -1,0 +1,34 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "schedule": ["on the first day of the month"],
+  "packageRules": [
+    {
+      "matchManagers": ["gradle"],
+      "groupName": "other dependencies"
+    },
+    {
+      "matchPackageNames": [
+        "org.jetbrains.kotlin:kotlin-stdlib",
+        "org.jetbrains.kotlin:kotlin-compiler",
+        "org.jetbrains.kotlin:analysis-api-for-ide",
+        "org.jetbrains.kotlin:analysis-api-impl-base-for-ide",
+        "org.jetbrains.kotlin:analysis-api-platform-interface-for-ide",
+        "org.jetbrains.kotlin:analysis-api-standalone-for-ide",
+        "org.jetbrains.kotlin:analysis-api-k2-for-ide",
+        "org.jetbrains.kotlin:low-level-api-fir-for-ide",
+        "org.jetbrains.kotlin:symbol-light-classes-for-ide",
+        "org.jetbrains.kotlin.jvm"
+      ],
+      "groupName": "kotlin"
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions"
+    },
+    {
+      "matchManagers": ["gradle-wrapper"],
+      "groupName": "gradle"
+    }
+  ]
+}
