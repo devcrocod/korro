@@ -53,11 +53,11 @@ be authored against any Kotlin version that the 2.3.20 Analysis API can parse.
 
 ### Tasks
 
-| Task         | Purpose                                                                                                                                    |
-|--------------|--------------------------------------------------------------------------------------------------------------------------------------------|
-| `korro`      | Regenerates markdown into `build/korro/docs/`. Cacheable. Never touches source files.                                                      |
-| `korroApply` | Copies generated output from `build/korro/docs/` onto `docs.baseDir`. Run locally after `korro` to propagate changes into the source tree. |
-| `korroCheck` | Regenerates docs into a temp directory and fails the build if the committed source tree is out of date. Run this in CI.                    |
+| Task            | Purpose                                                                                                                                   |
+|-----------------|-------------------------------------------------------------------------------------------------------------------------------------------|
+| `korroGenerate` | Regenerates markdown into `build/korro/docs/`. Cacheable. Never touches source files.                                                     |
+| `korro`         | Applies generated output from `build/korro/docs/` onto `docs.baseDir`. Depends on `korroGenerate`, so one command regenerates and copies. |
+| `korroCheck`    | Regenerates docs into a temp directory and fails the build if the committed source tree is out of date. Run this in CI.                   |
 
 There is no `korroClean` — use `./gradlew clean` or delete `build/korro/`. There is no `korroTest`.
 
@@ -65,7 +65,7 @@ Typical workflow:
 
 ```bash
 # Local authoring:
-./gradlew korro korroApply    # regenerate and update source markdown
+./gradlew korro               # regenerate and update source markdown in one step
 
 # CI:
 ./gradlew korroCheck          # fail if docs drift from samples
@@ -91,8 +91,8 @@ korro {
 ```
 
 - `docs.from(...)` is the set of markdown files to process.
-- `docs.baseDir` is **mandatory**. Output files land at `<buildDir>/korro/docs/<path-relative-to-baseDir>`, and
-  `korroApply` mirrors that tree back onto `baseDir`. Set it to whichever directory the paths in `docs.from` are rooted
+- `docs.baseDir` is **mandatory**. Output files land at `<buildDir>/korro/docs/<path-relative-to-baseDir>`, and the
+  `korro` task mirrors that tree back onto `baseDir`. Set it to whichever directory the paths in `docs.from` are rooted
   under — typically `layout.projectDirectory` or `layout.projectDirectory.dir("docs")`.
 - `samples.from(...)` is the set of Kotlin source files scanned for `FUN`/`FUNS` targets.
 - `samples.outputs.from(...)` is optional. A file in this collection whose name exactly equals a resolved `FUN`
@@ -239,7 +239,7 @@ fun example() {
 <!---END-->
 ```
 
-After `./gradlew korro korroApply`:
+After `./gradlew korro`:
 
 ````markdown
 # Example
@@ -260,8 +260,8 @@ println("hello")
 - The analysis backend moved from Dokka 1.x (K1) to the Kotlin Analysis API (K2, standalone mode).
 - The DSL is now nested and Property-based (config-cache safe). `docs = …` / `samples = …` became
   `docs { from(…); baseDir.set(…) }` / `samples { from(…); outputs.from(…) }`.
-- `korro` is cacheable and writes out-of-place to `build/korro/docs/`. Use the new `korroApply` to propagate into the
-  source tree and `korroCheck` in CI.
+- `korroGenerate` is cacheable and writes out-of-place to `build/korro/docs/`. `korro` depends on it and applies the
+  output onto the source tree; use `korroCheck` in CI.
 - Strict-by-default: unresolved `FUN`/`FUNS` fails the build. Opt back in to the old warn-and-continue behavior with
   `behavior { ignoreMissing.set(true) }`.
 - Assert rewriting is off by default. Restore with `behavior { rewriteAsserts.set(true) }`.

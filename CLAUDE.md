@@ -23,7 +23,7 @@ Build uses the Gradle wrapper (currently 9.4.1):
 - `./gradlew -Prelease build` — produce a release-versioned artifact. Without `-Prelease`, `detectVersion()` in `build.gradle.kts` appends `-dev` (or `-dev-<build.number>`) to the version in `gradle.properties`.
 - `./gradlew :integration-tests:test` — run the GradleTestKit integration tests under `integration-tests/fixtures/*`.
 
-The `korro` / `korroApply` / `korroCheck` tasks the plugin registers are only runnable from a *consumer* project that applies this plugin (or from one of the integration-test fixtures). They are not runnable from this repo's root.
+The `korroGenerate` / `korro` / `korroCheck` tasks the plugin registers are only runnable from a *consumer* project that applies this plugin (or from one of the integration-test fixtures). They are not runnable from this repo's root.
 
 ## Version wiring
 
@@ -44,12 +44,12 @@ Two layers separated by a worker boundary.
 
 **Gradle-facing layer** — `korro-gradle-plugin/`, runs in the Gradle daemon's classloader, no Analysis API imports.
 
-- `KorroPlugin` creates the `korro` extension, creates the detached `korroAnalysisRuntime` configuration (with a dependency on `io.github.devcrocod:korro-analysis:<pluginVersion>`), and in `afterEvaluate` registers three tasks: `korro`, `korroApply`, `korroCheck`. No `korroClean`.
+- `KorroPlugin` creates the `korro` extension, creates the detached `korroAnalysisRuntime` configuration (with a dependency on `io.github.devcrocod:korro-analysis:<pluginVersion>`), and in `afterEvaluate` registers three tasks: `korroGenerate`, `korro`, `korroCheck`. No `korroClean`.
 - `KorroExtension` (`KorroExtension.kt`) exposes the nested DSL: `docs { from(...); baseDir.set(...) }`, `samples { from(...); outputs.from(...) }`, `behavior { rewriteAsserts.set(...); ignoreMissing.set(...) }`, `groupSamples { ... }`. All properties use Gradle's `Property<T>` / `ConfigurableFileCollection` / `DirectoryProperty` for config-cache safety.
 - Tasks:
-  - `KorroTask` (`@CacheableTask`, extends `AbstractKorroTask`) — `@InputFiles docs`/`samples`/`samplesOutputs`, `@Input` flags, `@Classpath korroRuntimeClasspath`, `@OutputDirectory outputDirectory` (defaults to `build/korro/docs`). On `@TaskAction`, submits a `KorroWorkAction` via `WorkerExecutor.classLoaderIsolation { classpath.from(korroRuntimeClasspath) }`.
-  - `KorroApplyTask` (`@DisableCachingByDefault`, extends `Sync`) — wired to copy the `korro` task's output directory onto `docs.baseDir`. This is the only mutation point.
-  - `KorroCheckTask` (`@CacheableTask`, extends `AbstractKorroTask`) — **currently a stub.** The action logs "not implemented" and writes a placeholder `build/korro/check.report`. Full diff-against-source implementation is pending a follow-up phase; the task is already registered with the same inputs as `korro` so CI callers don't change later.
+  - `KorroGenerateTask` (registered as `korroGenerate`; `@CacheableTask`, extends `AbstractKorroTask`) — `@InputFiles docs`/`samples`/`samplesOutputs`, `@Input` flags, `@Classpath korroRuntimeClasspath`, `@OutputDirectory outputDirectory` (defaults to `build/korro/docs`). On `@TaskAction`, submits a `KorroWorkAction` via `WorkerExecutor.classLoaderIsolation { classpath.from(korroRuntimeClasspath) }`.
+  - `KorroTask` (registered as `korro`; `@DisableCachingByDefault`, extends `Copy`) — depends on `korroGenerate` and copies its output directory onto `docs.baseDir`. This is the only mutation point, and the default task users invoke. **Must be `Copy`, not `Sync`:** `docs.baseDir` is typically the project or repo root, which contains many files not managed by Korro (build scripts, sources, hidden dirs, untracked work). A `Sync` task deletes any file in the destination that isn't in the source — i.e. it would wipe the entire repo except the regenerated markdown tree.
+  - `KorroCheckTask` (`@CacheableTask`, extends `AbstractKorroTask`) — **currently a stub.** The action logs "not implemented" and writes a placeholder `build/korro/check.report`. Full diff-against-source implementation is pending a follow-up phase; the task is already registered with the same inputs as `korroGenerate` so CI callers don't change later.
 - `AbstractKorroTask.buildDocsToOutputs(outDir)` computes each input doc's output path relative to `docs.baseDir` — fails loudly if an input is outside `baseDir`.
 - `Korro.kt` is the markdown rewriter (parser + state machine). It lives in the plugin module, not the analysis module — parsing `<!---…-->` doesn't need Analysis API, so the parser can run without spinning up a worker.
 

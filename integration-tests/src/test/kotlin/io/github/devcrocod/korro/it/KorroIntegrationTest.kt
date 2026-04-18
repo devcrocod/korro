@@ -61,7 +61,11 @@ class KorroIntegrationTest {
 
         val result = runner.buildAndFail()
 
-        assertEquals(TaskOutcome.FAILED, result.task(":korro")?.outcome, "korro task should fail in strict mode")
+        assertEquals(
+            TaskOutcome.FAILED,
+            result.task(":korroGenerate")?.outcome,
+            "korroGenerate task should fail in strict mode",
+        )
         val output = result.output
         assertTrue(output.contains("nonExistent")) {
             "Expected failure output to name the unresolved directive 'nonExistent'; got:\n$output"

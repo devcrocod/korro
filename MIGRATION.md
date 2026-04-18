@@ -6,8 +6,9 @@ The plugin id (`io.github.devcrocod.korro`) and the `<!---…-->` directive gram
 What changed:
 
 - The `korro { }` DSL is now nested and Property-based. Assignments (`docs = …`, `beforeGroup = …`) no longer compile.
-- `korro` no longer mutates source files. It writes to `build/korro/docs/`, and a new `korroApply` task copies back onto
-  the source tree. Use `korroCheck` in CI.
+- `korro` still mutates source files (end-to-end: regenerate + apply), but the heavy lifting moved to a new
+  `korroGenerate` task that writes to `build/korro/docs/` and is cacheable/safe to run from CI. `korro` now depends on
+  `korroGenerate` and copies its output onto the source tree. Use `korroCheck` in CI instead of `korro`.
 - Unresolved `FUN` references now fail the build by default (was: silently kept the stale snippet).
 - Minimum Gradle 8.5, JDK 17, Kotlin Analysis API 2.3.20 bundled.
 
@@ -43,8 +44,9 @@ API in an isolated worker classloader, so there is no version alignment required
 ```
 
 `docs.baseDir` is mandatory. Korro 0.2.0 writes output out-of-place to `build/korro/docs/<path-relative-to-baseDir>`,
-and `korroApply` mirrors that tree back onto `baseDir`. Set it to whichever directory the paths in `docs.from` are
-rooted under — usually `project.rootDir` or `layout.projectDirectory.dir("docs")`.
+and the `korro` task (a `Copy` wrapper around `korroGenerate`) mirrors that tree back onto `baseDir`. Set it to whichever
+directory the paths in `docs.from` are rooted under — usually `project.rootDir` or
+`layout.projectDirectory.dir("docs")`.
 
 ### `samples` and `outputs`
 
@@ -101,15 +103,16 @@ See "Behavior changes" below for when you'll need to flip these.
 
 ## Task migration
 
-| 0.1.x                              | 0.2.0                                                                                           |
-|------------------------------------|-------------------------------------------------------------------------------------------------|
-| `./gradlew korro` (mutates source) | `./gradlew korro` (writes `build/korro/docs/`), then `./gradlew korroApply` to copy onto source |
-| `./gradlew korroClean`             | `./gradlew clean` or `rm -rf build/korro/`                                                      |
-| `korroCheck` (TODO)                | `./gradlew korroCheck` — fails when committed docs don't match regeneration. Use in CI.         |
-| `korroTest` (TODO)                 | Not implemented; deferred.                                                                      |
+| 0.1.x                              | 0.2.0                                                                                   |
+|------------------------------------|-----------------------------------------------------------------------------------------|
+| `./gradlew korro` (mutates source) | `./gradlew korro` (regenerates into `build/korro/docs/` via `korroGenerate`, then applies onto source) |
+| —                                  | `./gradlew korroGenerate` — cacheable, out-of-place only; the task to wire into CI builds that don't want source mutation |
+| `./gradlew korroClean`             | `./gradlew clean` or `rm -rf build/korro/`                                              |
+| `korroCheck` (TODO)                | `./gradlew korroCheck` — fails when committed docs don't match regeneration. Use in CI. |
+| `korroTest` (TODO)                 | Not implemented; deferred.                                                              |
 
-The split between `korro` and `korroApply` is what makes `korro` cacheable and safe to run from CI without mutating the
-repo.
+The split between `korroGenerate` (cacheable, out-of-place) and `korro` (copies onto source) is what keeps regeneration
+safe to run from CI without mutating the repo.
 
 ## Behavior changes
 

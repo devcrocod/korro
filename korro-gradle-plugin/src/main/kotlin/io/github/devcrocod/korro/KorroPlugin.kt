@@ -17,7 +17,7 @@ class KorroPlugin : Plugin<Project> {
         dependencies.add(runtime.name, "io.github.devcrocod:korro-analysis:$korroPluginVersion")
 
         afterEvaluate {
-            val korroTask = tasks.register("korro", KorroTask::class.java) { t ->
+            val korroTask = tasks.register("korroGenerate", KorroGenerateTask::class.java) { t ->
                 t.description = "Generates markdown docs with sample snippets into build/korro/docs."
                 t.group = "documentation"
                 t.docs.from(ext.docs.from)
@@ -36,8 +36,8 @@ class KorroPlugin : Plugin<Project> {
                 t.korroPluginVersion.set(korroPluginVersion)
             }
 
-            tasks.register("korroApply", KorroApplyTask::class.java) { t ->
-                t.description = "Copies generated docs onto the source tree (mutates source)."
+            tasks.register("korro", KorroTask::class.java) { t ->
+                t.description = "Applies generated docs onto the source tree (runs korroGenerate first)."
                 t.group = "documentation"
                 t.dependsOn(korroTask)
                 t.from(korroTask.flatMap { it.outputDirectory })
