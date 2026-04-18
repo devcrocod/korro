@@ -1,15 +1,16 @@
 # Korro
 
 [![Apache license](https://img.shields.io/badge/license-Apache%20License%202.0-blue.svg?style=flat)](https://www.apache.org/licenses/LICENSE-2.0)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.devcrocod/korro-gradle-plugin?label=Maven%20Central)](https://central.sonatype.com/artifact/io.github.devcrocod/korro-gradle-plugin)
 [![Gradle plugin](https://img.shields.io/maven-metadata/v/https/plugins.gradle.org/m2/io/github/devcrocod/korro/maven-metadata.xml.svg?label=Gradle+plugin)](https://plugins.gradle.org/plugin/io.github.devcrocod.korro)
 
-Kotlin source code documentation plugin.
+Keep your Kotlin documentation snippets compiled, testable, and in sync with real source code.
 
 Inspired by [kotlinx-knit](https://github.com/Kotlin/kotlinx-knit).
 
-Korro injects Kotlin sample snippets into Markdown and MDX documents. You point it at some `.md`/`.mdx` files and some
-Kotlin source files, mark regions with `<!---FUN ...-->` directives (or `{/*---FUN ...--*/}` in MDX), and Korro fills
-those regions with the body of the referenced function.
+Korro embeds Kotlin sample snippets into Markdown and MDX documents. The snippets are ordinary functions in your
+Kotlin source tree. Korro then extracts the function bodies and writes them into your docs, so the code readers see is
+the same code your CI builds and tests.
 
 <!---TOC-->
 
@@ -37,7 +38,10 @@ plugins {
 }
 ```
 
-The legacy `buildscript { classpath … }` installation form is no longer supported. 0.2.0 requires the `plugins { }` DSL.
+> [!NOTE]
+> The plugin is also published to Maven Central as `io.github.devcrocod:korro-gradle-plugin`, so you can apply it from
+> `buildSrc` or a convention plugin — add the artifact as a regular dependency there and `apply` the
+> `io.github.devcrocod.korro` id from your convention. The classic `buildscript { classpath … }` form works too.
 
 ### Baseline
 
@@ -60,6 +64,10 @@ be authored against any Kotlin version that the 2.3.20 Analysis API can parse.
 | `korroCheck`    | Regenerates docs into a temp directory and fails the build if the committed source tree is out of date. Run this in CI.                   |
 
 There is no `korroClean` — use `./gradlew clean` or delete `build/korro/`. There is no `korroTest`.
+
+> [!IMPORTANT]
+> `korro` is the only task that writes into your source tree. `korroGenerate` and `korroCheck` stay entirely under
+> `build/korro/` and never mutate docs — safe to run in any environment, including CI.
 
 Typical workflow:
 
@@ -107,6 +115,10 @@ korro {
   non-function targets fail the task with a collected diagnostic list. Set `true` to degrade those errors to warnings
   and keep the old snippet lines in the output.
 
+> [!TIP]
+> Keep strict mode on outside of staged migrations — it surfaces broken references the moment a sample is renamed or
+> removed. Leaving `ignoreMissing` on permanently lets doc drift slip through unnoticed.
+
 ### Grouping samples
 
 Use `groupSamples` to wrap multiple related snippets (for example, HTML tabs). Semantics are unchanged from 0.1.x; only
@@ -125,7 +137,8 @@ korro {
 }
 ```
 
-For new docs, prefer a single `FUNS myFun_v*` directive over two `FUN myFun_v1` / `FUN myFun_v2` directives.
+> [!TIP]
+> For new docs, prefer a single `FUNS myFun_v*` directive over two `FUN myFun_v1` / `FUN myFun_v2` directives.
 
 ## Directives
 
@@ -147,6 +160,11 @@ MDX equivalents (for Mintlify, Docusaurus, etc.):
 {/*---FUN exampleTest--*/}
 {/*---END--*/}
 ```
+
+> [!NOTE]
+> MDX tooling (Mintlify, Docusaurus) rejects raw HTML comments, so `.mdx` directives use the JSX-expression form
+> `{/*---…--*/}`. The three-dash opener (`<!---` / `{/*---`) is intentional — standard comments `<!--` and `{/*` are
+> ignored, so ordinary comments in your docs pass through untouched.
 
 ### IMPORT
 
@@ -197,7 +215,12 @@ Closes `FUN` or `FUNS`.
 
 ## Example
 
-Minimal end-to-end setup (lifted from `integration-tests/fixtures/basic/`):
+Minimal end-to-end setup (lifted from `integration-tests/fixtures/basic/`).
+
+> [!TIP]
+> A ready-to-copy consumer project lives at [`integration-tests/fixtures/basic/`](integration-tests/fixtures/basic).
+> The sibling fixtures under [`integration-tests/fixtures/`](integration-tests/fixtures) cover MDX, `FUNS` globs,
+> `ignoreMissing`, and `korroCheck` — useful references for less-common configurations.
 
 `settings.gradle.kts`:
 
@@ -282,5 +305,3 @@ println("hello")
 - `korroClean` is removed; `korroTest` is deferred.
 
 Full upgrade guide: [MIGRATION.md](MIGRATION.md).
-
-A ready-to-copy consumer project lives at [`integration-tests/fixtures/basic/`](integration-tests/fixtures/basic).
