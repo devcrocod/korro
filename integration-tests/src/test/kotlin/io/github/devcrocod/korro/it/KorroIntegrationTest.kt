@@ -1,0 +1,252 @@
+package io.github.devcrocod.korro.it
+
+import org.gradle.testkit.runner.GradleRunner
+import org.gradle.testkit.runner.InvalidPluginMetadataException
+import org.gradle.testkit.runner.TaskOutcome
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.Path
+import kotlin.io.path.readText
+import kotlin.io.path.writeText
+
+class KorroIntegrationTest {
+
+    @Test
+    fun basicFixture(@TempDir tempDir: Path) {
+        runFixture(
+            name = "basic",
+            tempDir = tempDir,
+            generatedRelativePath = "build/korro/docs/foo.md",
+            expectedRelativePath = "basic/docs/expected/foo.md",
+        )
+    }
+
+    @Test
+    fun commonTestFixture(@TempDir tempDir: Path) {
+        runFixture(
+            name = "commonTest",
+            tempDir = tempDir,
+            generatedRelativePath = "build/korro/docs/readme.md",
+            expectedRelativePath = "commonTest/docs/expected/readme.md",
+        )
+    }
+
+    @Test
+    fun funsFixture(@TempDir tempDir: Path) {
+        runFixture(
+            name = "funs",
+            tempDir = tempDir,
+            generatedRelativePath = "build/korro/docs/readme.md",
+            expectedRelativePath = "funs/docs/expected/readme.md",
+        )
+    }
+
+    @Test
+    fun mdxFixture(@TempDir tempDir: Path) {
+        runFixture(
+            name = "mdx",
+            tempDir = tempDir,
+            generatedRelativePath = "build/korro/docs/overview.mdx",
+            expectedRelativePath = "mdx/docs/expected/overview.mdx",
+        )
+    }
+
+    @Test
+    fun strictModeFailsOnMissing(@TempDir tempDir: Path) {
+        val fixture = loadFixture("strictErrors", tempDir)
+
+        val runner = GradleRunner.create()
+            .withProjectDir(fixture.toFile())
+            .withArguments("korro", "--stacktrace")
+            .forwardOutput()
+
+        configurePluginClasspath(runner)
+        System.getProperty("korro.testkit.gradleVersion")
+            ?.takeIf { it.isNotBlank() }
+            ?.let(runner::withGradleVersion)
+
+        val result = runner.buildAndFail()
+
+        assertEquals(
+            TaskOutcome.FAILED,
+            result.task(":korroGenerate")?.outcome,
+            "korroGenerate task should fail in strict mode",
+        )
+        val output = result.output
+        assertTrue(output.contains("nonExistent")) {
+            "Expected failure output to name the unresolved directive 'nonExistent'; got:\n$output"
+        }
+        assertTrue(output.contains("error(s) found")) {
+            "Expected failure output to contain formatted diagnostic table header; got:\n$output"
+        }
+    }
+
+    @Test
+    fun ignoreMissingPreservesSource(@TempDir tempDir: Path) {
+        runFixture(
+            name = "ignoreMissing",
+            tempDir = tempDir,
+            generatedRelativePath = "build/korro/docs/broken.md",
+            expectedRelativePath = "ignoreMissing/docs/expected/broken.md",
+        )
+    }
+
+    @Test
+    fun korroCheckPassesWhenUpToDate(@TempDir tempDir: Path) {
+        val fixture = loadFixture("checkOk", tempDir)
+
+        val runner = GradleRunner.create()
+            .withProjectDir(fixture.toFile())
+            .withArguments("korroCheck", "--stacktrace")
+            .forwardOutput()
+
+        configurePluginClasspath(runner)
+        System.getProperty("korro.testkit.gradleVersion")
+            ?.takeIf { it.isNotBlank() }
+            ?.let(runner::withGradleVersion)
+
+        val result = runner.build()
+
+        assertEquals(
+            TaskOutcome.SUCCESS,
+            result.task(":korroCheck")?.outcome,
+            "korroCheck should succeed when docs are up to date",
+        )
+        val report = fixture.resolve("build/korro/check.report")
+        assertTrue(Files.exists(report)) { "korroCheck did not produce $report" }
+        assertTrue(report.readText().contains("OK")) {
+            "Expected OK report, got:\n${report.readText()}"
+        }
+    }
+
+    @Test
+    fun korroCheckFailsWhenOutOfDate(@TempDir tempDir: Path) {
+        val fixture = loadFixture("basic", tempDir)
+
+        val runner = GradleRunner.create()
+            .withProjectDir(fixture.toFile())
+            .withArguments("korroCheck", "--stacktrace")
+            .forwardOutput()
+
+        configurePluginClasspath(runner)
+        System.getProperty("korro.testkit.gradleVersion")
+            ?.takeIf { it.isNotBlank() }
+            ?.let(runner::withGradleVersion)
+
+        val result = runner.buildAndFail()
+
+        assertEquals(
+            TaskOutcome.FAILED,
+            result.task(":korroCheck")?.outcome,
+            "korroCheck should fail when docs differ from regeneration",
+        )
+        val output = result.output
+        assertTrue(output.contains("foo.md")) {
+            "Expected failure output to name the out-of-date file; got:\n$output"
+        }
+        assertTrue(output.contains("out of date")) {
+            "Expected 'out of date' in the diff report; got:\n$output"
+        }
+        val report = fixture.resolve("build/korro/check.report")
+        assertTrue(Files.exists(report)) { "korroCheck did not produce $report" }
+    }
+
+    private fun runFixture(
+        name: String,
+        tempDir: Path,
+        generatedRelativePath: String,
+        expectedRelativePath: String,
+    ) {
+        val fixture = loadFixture(name, tempDir)
+
+        val runner = GradleRunner.create()
+            .withProjectDir(fixture.toFile())
+            .withArguments("korro", "--stacktrace")
+            .forwardOutput()
+
+        configurePluginClasspath(runner)
+
+        System.getProperty("korro.testkit.gradleVersion")
+            ?.takeIf { it.isNotBlank() }
+            ?.let(runner::withGradleVersion)
+
+        val result = runner.build()
+
+        assertEquals(TaskOutcome.SUCCESS, result.task(":korro")?.outcome, "korro task outcome for $name")
+
+        val actualFile = fixture.resolve(generatedRelativePath)
+        assertTrue(Files.exists(actualFile)) { "korro did not produce $actualFile" }
+
+        val expectedFile = fixturesRoot().resolve(expectedRelativePath)
+        val actual = normalize(actualFile.readText())
+
+        if (System.getProperty("korro.regenerate.expected") == "true") {
+            expectedFile.writeText(actual)
+            return
+        }
+
+        val expected = normalize(expectedFile.readText())
+        assertEquals(expected, actual, "Generated markdown does not match golden file for $name")
+    }
+
+    private fun loadFixture(name: String, tempDir: Path): Path {
+        val source = fixturesRoot().resolve(name).toFile()
+        val target = tempDir.resolve(name).toFile()
+        source.copyRecursively(target, overwrite = true)
+        return target.toPath()
+    }
+
+    private fun fixturesRoot(): Path {
+        System.getProperty("korro.fixtures.dir")?.let { return File(it).toPath() }
+
+        val cwd = File("").absoluteFile.toPath()
+        val candidates = listOfNotNull(
+            cwd.resolve("fixtures"),
+            cwd.resolve("integration-tests/fixtures"),
+            cwd.parent?.resolve("fixtures"),
+        )
+        return candidates.firstOrNull { Files.isDirectory(it) }
+            ?: error(
+                "Cannot locate integration-tests/fixtures. " +
+                        "Set system property 'korro.fixtures.dir' or run via `./gradlew integration-tests:test`. " +
+                        "CWD=$cwd"
+            )
+    }
+
+    private fun normalize(s: String): String = s.replace("\r\n", "\n")
+
+    private fun configurePluginClasspath(runner: GradleRunner) {
+        try {
+            runner.withPluginClasspath()
+        } catch (_: InvalidPluginMetadataException) {
+            runner.withPluginClasspath(fallbackPluginClasspath())
+        }
+    }
+
+    private fun fallbackPluginClasspath(): List<File> {
+        val jar = findPluginShadowJar()
+            ?: error(
+                "Cannot locate korro-gradle-plugin shadow jar. " +
+                        "Run `./gradlew korro-gradle-plugin:shadowJar` first, " +
+                        "or run tests via `./gradlew integration-tests:test`."
+            )
+        return listOf(jar)
+    }
+
+    private fun findPluginShadowJar(): File? {
+        val cwd = File("").absoluteFile
+        val candidates = listOfNotNull(
+            cwd.resolve("../korro-gradle-plugin/build/libs"),
+            cwd.resolve("korro-gradle-plugin/build/libs"),
+            cwd.parentFile?.resolve("korro-gradle-plugin/build/libs"),
+        ).filter { it.isDirectory }
+        return candidates.asSequence()
+            .flatMap { (it.listFiles { _, name -> name.endsWith(".jar") } ?: emptyArray<File>()).asSequence() }
+            .filterNot { it.name.contains("-sources") || it.name.contains("-javadoc") }
+            .firstOrNull()
+    }
+}
