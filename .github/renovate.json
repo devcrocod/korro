@@ -20,7 +20,16 @@
         "org.jetbrains.kotlin:symbol-light-classes-for-ide",
         "org.jetbrains.kotlin.jvm"
       ],
-      "groupName": "kotlin"
+      "groupName": "kotlin",
+      "allowedVersions": "/^\\d+\\.\\d+\\.\\d+$/"
+    },
+    {
+      "matchPackageNames": [
+        "org.junit:junit-bom",
+        "org.junit.jupiter:junit-jupiter",
+        "org.junit.platform:junit-platform-launcher"
+      ],
+      "allowedVersions": "<6"
     },
     {
       "matchManagers": ["github-actions"],
