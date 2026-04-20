@@ -11,12 +11,12 @@ repositories {
 korro {
     docs {
         from(fileTree("docs/in"))
-        baseDir.set(layout.projectDirectory.dir("docs/in"))
+        baseDir = layout.projectDirectory.dir("docs/in")
     }
     samples {
         from(fileTree("samples"))
     }
     behavior {
-        ignoreMissing.set(true)
+        ignoreMissing = true
     }
 }

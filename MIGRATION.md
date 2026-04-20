@@ -5,7 +5,8 @@
 The plugin id (`io.github.devcrocod.korro`) and the `<!---…-->` directive grammar in your markdown are **unchanged**.
 What changed:
 
-- The `korro { }` DSL is now nested and Property-based. Assignments (`docs = …`, `beforeGroup = …`) no longer compile.
+- The `korro { }` DSL is now nested. Top-level assignments (`docs = fileTree(…)`, `samples = …`) no longer compile;
+  configuration lives inside `docs { … }` / `samples { … }` / `behavior { … }` blocks.
 - `korro` still mutates source files (end-to-end: regenerate + apply), but the heavy lifting moved to a new
   `korroGenerate` task that writes to `build/korro/docs/` and is cacheable/safe to run from CI. `korro` now depends on
   `korroGenerate` and copies its output onto the source tree. Use `korroCheck` in CI instead of `korro`.
@@ -38,7 +39,7 @@ API in an isolated worker classloader, so there is no version alignment required
 -     }
 +     docs {
 +         from(fileTree(project.rootDir) { include("**/*.md") })
-+         baseDir.set(project.rootDir)                    // REQUIRED
++         baseDir = project.rootDir                       // REQUIRED
 +     }
   }
 ```
@@ -66,25 +67,22 @@ equals a resolved `FUN` fully-qualified name is appended verbatim after the gene
 
 ### `groupSamples`
 
-```diff
-  korro {
-      groupSamples {
--         beforeGroup = "<tabs>\n"
--         afterGroup = "</tabs>"
--         beforeSample = "<tab title=\"NAME\">\n"
--         afterSample = "\n</tab>"
-+         beforeGroup.set("<tabs>\n")
-+         afterGroup.set("</tabs>")
-+         beforeSample.set("<tab title=\"NAME\">\n")
-+         afterSample.set("\n</tab>")
-          funSuffix("_v1") { replaceText("NAME", "Version 1") }
-          funSuffix("_v2") { replaceText("NAME", "Version 2") }
-      }
-  }
+`groupSamples` is unchanged for Kotlin DSL consumers — keep writing assignments as before:
+
+```kotlin
+korro {
+    groupSamples {
+        beforeGroup = "<tabs>\n"
+        afterGroup = "</tabs>"
+        beforeSample = "<tab title=\"NAME\">\n"
+        afterSample = "\n</tab>"
+        funSuffix("_v1") { replaceText("NAME", "Version 1") }
+        funSuffix("_v2") { replaceText("NAME", "Version 2") }
+    }
+}
 ```
 
-All string and boolean properties are now `Property<T>` — assign with `.set(...)`. The
-`funSuffix(...) { replaceText(...) }` helper is unchanged.
+The `funSuffix(...) { replaceText(...) }` helper is unchanged.
 
 ### `behavior` (new)
 
@@ -93,8 +91,8 @@ Two flags moved into a dedicated `behavior { }` block. Both default to `false`:
 ```kotlin
 korro {
     behavior {
-        ignoreMissing.set(false)
-        rewriteAsserts.set(false)
+        ignoreMissing = false
+        rewriteAsserts = false
     }
 }
 ```
@@ -119,12 +117,12 @@ safe to run from CI without mutating the repo.
 - **Unresolved `FUN` now fails the build.** 0.1.x silently kept the existing snippet text in the output. To restore that
   behavior:
   ```kotlin
-  korro { behavior { ignoreMissing.set(true) } }
+  korro { behavior { ignoreMissing = true } }
   ```
 - **`assertPrints` / `assertTrue` / `assertFalse` / `assertFails` / `assertFailsWith` are no longer rewritten into
   commented `println` by default.** Restore with:
   ```kotlin
-  korro { behavior { rewriteAsserts.set(true) } }
+  korro { behavior { rewriteAsserts = true } }
   ```
 - **Unclosed `//SampleStart`** (a start marker with no matching `//SampleEnd` in the same function) is now a diagnostic
   error. 0.1.x silently included the tail of the function.

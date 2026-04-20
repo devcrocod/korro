@@ -85,15 +85,15 @@ Typical workflow:
 korro {
     docs {
         from(fileTree("docs") { include("**/*.md", "**/*.mdx") })
-        baseDir.set(layout.projectDirectory.dir("docs"))   // REQUIRED
+        baseDir = layout.projectDirectory.dir("docs")   // REQUIRED
     }
     samples {
         from(fileTree("src/test/samples"))
-        outputs.from(fileTree("build/sampleOutputs"))      // optional
+        outputs.from(fileTree("build/sampleOutputs"))   // optional
     }
     behavior {
-        rewriteAsserts.set(false)
-        ignoreMissing.set(false)
+        rewriteAsserts = false
+        ignoreMissing = false
     }
 }
 ```
@@ -121,16 +121,15 @@ korro {
 
 ### Grouping samples
 
-Use `groupSamples` to wrap multiple related snippets (for example, HTML tabs). Semantics are unchanged from 0.1.x; only
-the property API moved from `= ...` to `.set(...)`.
+Use `groupSamples` to wrap multiple related snippets (for example, HTML tabs).
 
 ```kotlin
 korro {
     groupSamples {
-        beforeGroup.set("<tabs>\n")
-        afterGroup.set("</tabs>")
-        beforeSample.set("<tab title=\"NAME\">\n")
-        afterSample.set("\n</tab>")
+        beforeGroup = "<tabs>\n"
+        afterGroup = "</tabs>"
+        beforeSample = "<tab title=\"NAME\">\n"
+        afterSample = "\n</tab>"
         funSuffix("_v1") { replaceText("NAME", "Version 1") }
         funSuffix("_v2") { replaceText("NAME", "Version 2") }
     }
@@ -243,7 +242,7 @@ repositories {
 korro {
     docs {
         from(fileTree("docs"))
-        baseDir.set(layout.projectDirectory.dir("docs"))
+        baseDir = layout.projectDirectory.dir("docs")
     }
     samples {
         from(fileTree("samples"))
@@ -294,12 +293,12 @@ println("hello")
 
 - The analysis backend moved from Dokka 1.x (K1) to the Kotlin Analysis API (K2, standalone mode).
 - The DSL is now nested and Property-based (config-cache safe). `docs = …` / `samples = …` became
-  `docs { from(…); baseDir.set(…) }` / `samples { from(…); outputs.from(…) }`.
+  `docs { from(…); baseDir = … }` / `samples { from(…); outputs.from(…) }`.
 - `korroGenerate` is cacheable and writes out-of-place to `build/korro/docs/`. `korro` depends on it and applies the
   output onto the source tree; use `korroCheck` in CI.
 - Strict-by-default: unresolved `FUN`/`FUNS` fails the build. Opt back in to the old warn-and-continue behavior with
-  `behavior { ignoreMissing.set(true) }`.
-- Assert rewriting is off by default. Restore with `behavior { rewriteAsserts.set(true) }`.
+  `behavior { ignoreMissing = true }`.
+- Assert rewriting is off by default. Restore with `behavior { rewriteAsserts = true }`.
 - `FUNS` is now implemented as a glob-filter directive.
 - MDX files (`.mdx`) are supported natively via a JSX-expression directive form `{/*---FUN ...--*/}`.
 - `korroClean` is removed; `korroTest` is deferred.
