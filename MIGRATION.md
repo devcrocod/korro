@@ -128,8 +128,11 @@ safe to run from CI without mutating the repo.
   error. 0.1.x silently included the tail of the function.
 - **Functions with no `//SampleStart`/`//SampleEnd`** now emit the whole body (minus the outer `{ }`). 0.1.x returned an
   empty snippet.
-- **Non-function targets** (properties, classes, top-level declarations, `.kts` scripts) now produce a diagnostic. Only
-  `fun` declarations are valid `FUN` targets.
+- **Non-function targets.** 0.2.0 narrowed `FUN`/`FUNS` to `fun` declarations only, which broke 0.1.x-style docs
+  pointing at an `object` / `class` / `interface` / `val`. 0.2.x restores support: `KtNamedFunction`, `KtClassOrObject`,
+  and `KtProperty` are all valid targets. Enum entries, type aliases, and `.kts` scripts are not; unresolved references
+  still produce a diagnostic. Class / object / property targets render the region between `//SampleStart` /
+  `//SampleEnd` markers inside their body (same marker semantics as function bodies).
 
 All new diagnostics are collected across the whole run and reported as a single table at the end of the task.
 

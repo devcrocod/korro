@@ -10,8 +10,8 @@ import org.jetbrains.kotlin.psi.psiUtil.prevLeaf
 
 class SampleExtractor(private val rewriteAsserts: Boolean) {
 
-    fun extract(function: KtNamedFunction): String {
-        val body = processBody(function)
+    fun extract(decl: KtNamedDeclaration): String {
+        val body = processBody(decl)
         return createSampleBody(body)
     }
 

@@ -63,5 +63,5 @@ These are contracts for every consumer's docs; breaking any of them silently bre
 - **Three dashes to open, two to close.** `<!---NAME VALUE-->` for `.md` (and anything non-`.mdx`); `{/*---NAME VALUE--*/}` for `.mdx`. Do not collapse the open marker to two dashes — that becomes a standard HTML/MDX comment, and consumer docs rely on the distinction.
 - **Directive name regex is `[_a-zA-Z.]+`.** Broadening it changes parsing for every consumer.
 - **First `IMPORT` wins** on ambiguous short names (`firstNotNullOfOrNull` over the `imports` list).
-- **Only `KtNamedFunction`** is a valid `FUN`/`FUNS` target. Properties, classes, top-level expressions, and `.kts` scripts must produce a diagnostic, not a silent empty snippet.
+- **`KtNamedFunction`, `KtClassOrObject`, and `KtProperty`** are valid `FUN`/`FUNS` targets. Enum entries, type aliases, local declarations, and `.kts` scripts are not; resolving to a non-target produces a diagnostic, not a silent empty snippet. Class/object/property targets rely on `//SampleStart` / `//SampleEnd` markers inside their body for non-empty output.
 - **`behavior.ignoreMissing=false` is the strict-by-default contract.** Don't silently lower severity on unresolved references without an explicit opt-in.
