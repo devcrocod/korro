@@ -79,9 +79,16 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
     fun processFun(funName: String, oldSampleLines: List<String>, directiveLine: Int) {
         val newSamplesLines = renderFunBody(funName)
         if (newSamplesLines == null) {
-            val hint = samplesTransformer.suggestions(funName).takeIf { it.isNotEmpty() }
-                ?.joinToString(prefix = "did you mean: ", separator = ", ")
-            reportMissing(directiveLine, "Cannot resolve FUN '$funName'", hint)
+            val ambiguous = samplesTransformer.ambiguous(funName)
+            val (message, hint) = if (ambiguous != null) {
+                "Ambiguous FUN '$funName'" to
+                    "candidates: ${ambiguous.joinToString(", ")}; qualify with IMPORT"
+            } else {
+                val suggestions = samplesTransformer.suggestions(funName).takeIf { it.isNotEmpty() }
+                    ?.joinToString(prefix = "did you mean: ", separator = ", ")
+                "Cannot resolve FUN '$funName'" to suggestions
+            }
+            reportMissing(directiveLine, message, hint)
             lines.addAll(oldSampleLines)
             return
         }
@@ -125,7 +132,7 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
     fun processFuns(glob: String, oldSampleLines: List<String>, directiveLine: Int) {
         val newSamplesLines = renderFunsBody(glob)
         if (newSamplesLines == null) {
-            reportMissing(directiveLine, "FUNS '$glob' matched no functions")
+            reportMissing(directiveLine, "FUNS '$glob' matched no declarations")
             lines.addAll(oldSampleLines)
             return
         }

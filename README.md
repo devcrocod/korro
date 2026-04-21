@@ -189,8 +189,11 @@ If the function contains `//SampleStart` / `//SampleEnd` comments, only the regi
 pairs are concatenated, separated by a blank line. If the function has no markers, the whole body is emitted (without
 the outer `{ }`).
 
-Only `fun` declarations (`KtNamedFunction`) are valid targets. Properties, classes, top-level expressions, and `.kts`
-scripts are not. Don't wrap function names in backticks.
+Valid targets are `fun` declarations, classes / objects / interfaces, and top-level or member properties
+(`KtNamedFunction`, `KtClassOrObject`, `KtProperty`). For class, object, or property targets, the snippet contents come
+from `//SampleStart` / `//SampleEnd` markers inside the declaration body — the wrapper name is not emitted, only the
+marker-bracketed region. Enum entries, type aliases, local declarations, and `.kts` scripts are not valid targets.
+Don't wrap names in backticks.
 
 ### FUNS
 

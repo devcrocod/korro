@@ -12,20 +12,22 @@ class SamplesTransformer(
     private val resolver = FqnResolver(session)
     private val extractor = SampleExtractor(rewriteAsserts)
 
-    operator fun invoke(functionName: String): String? {
-        val fn = resolver.resolve(functionName) ?: return null
-        return extractor.extract(fn)
+    operator fun invoke(name: String): String? {
+        val decl = resolver.resolve(name) ?: return null
+        return extractor.extract(decl)
     }
 
     fun matchGlob(globPattern: String, imports: List<String>): List<RenderedSample> {
         val matches = resolver.matchGlob(globPattern, imports)
-        return matches.map { fn ->
-            val fqn = fn.fqName?.asString() ?: fn.name ?: "<anonymous>"
-            RenderedSample(fqn, extractor.extract(fn))
+        return matches.map { decl ->
+            val fqn = decl.fqName?.asString() ?: decl.name ?: "<anonymous>"
+            RenderedSample(fqn, extractor.extract(decl))
         }
     }
 
     fun suggestions(bareName: String): List<String> = resolver.suggestShortNames(bareName)
+
+    fun ambiguous(bareName: String): List<String>? = resolver.ambiguous(bareName)
 
     override fun close() {
         session.close()

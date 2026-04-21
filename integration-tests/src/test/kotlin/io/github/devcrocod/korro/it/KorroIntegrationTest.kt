@@ -26,6 +26,16 @@ class KorroIntegrationTest {
     }
 
     @Test
+    fun declarationsFixture(@TempDir tempDir: Path) {
+        runFixture(
+            name = "declarations",
+            tempDir = tempDir,
+            generatedRelativePath = "build/korro/docs/readme.md",
+            expectedRelativePath = "declarations/docs/expected/readme.md",
+        )
+    }
+
+    @Test
     fun commonTestFixture(@TempDir tempDir: Path) {
         runFixture(
             name = "commonTest",

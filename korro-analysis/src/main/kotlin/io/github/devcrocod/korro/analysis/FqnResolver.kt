@@ -1,26 +1,30 @@
 package io.github.devcrocod.korro.analysis
 
 import org.jetbrains.kotlin.psi.KtClassOrObject
+import org.jetbrains.kotlin.psi.KtDeclaration
+import org.jetbrains.kotlin.psi.KtEnumEntry
 import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.psi.KtNamedDeclaration
 import org.jetbrains.kotlin.psi.KtNamedFunction
+import org.jetbrains.kotlin.psi.KtProperty
 
 class FqnResolver(session: KorroAnalysisSession) {
-    private val byFqn: Map<String, KtNamedFunction>
-    private val byShortName: Map<String, List<KtNamedFunction>>
-    private val ordered: List<Pair<String, KtNamedFunction>>
+    private val byFqn: Map<String, KtNamedDeclaration>
+    private val byShortName: Map<String, List<KtNamedDeclaration>>
+    private val ordered: List<Pair<String, KtNamedDeclaration>>
 
     init {
-        val fqn = linkedMapOf<String, KtNamedFunction>()
-        val shortName = linkedMapOf<String, MutableList<KtNamedFunction>>()
-        val orderedList = mutableListOf<Pair<String, KtNamedFunction>>()
+        val fqn = linkedMapOf<String, KtNamedDeclaration>()
+        val shortName = linkedMapOf<String, MutableList<KtNamedDeclaration>>()
+        val orderedList = mutableListOf<Pair<String, KtNamedDeclaration>>()
         val files = session.files.sortedBy { it.virtualFilePath }
-        files.forEach { file -> collectFunctions(file, fqn, shortName, orderedList) }
+        files.forEach { file -> collectDeclarations(file, fqn, shortName, orderedList) }
         byFqn = fqn
         byShortName = shortName
         ordered = orderedList
     }
 
-    fun resolve(candidateFqn: String): KtNamedFunction? {
+    fun resolve(candidateFqn: String): KtNamedDeclaration? {
         byFqn[candidateFqn]?.let { return it }
         if ('.' !in candidateFqn) {
             byShortName[candidateFqn]?.singleOrNull()?.let { return it }
@@ -29,19 +33,31 @@ class FqnResolver(session: KorroAnalysisSession) {
     }
 
     /**
-     * Return every function whose FQN matches `prefix + pattern` for some prefix in [prefixes].
-     * Deduplicates across prefixes (a function reached via several prefixes appears once),
+     * FQNs of every declaration sharing [bareName] when the short name is ambiguous,
+     * or `null` when the name is unambiguous, qualified (contains a dot), or unknown.
+     * Used by callers to distinguish "not found" from "multiple matches" in diagnostics.
+     */
+    fun ambiguous(bareName: String): List<String>? {
+        if ('.' in bareName) return null
+        val candidates = byShortName[bareName] ?: return null
+        if (candidates.size < 2) return null
+        return candidates.mapNotNull { it.fqName?.asString() }
+    }
+
+    /**
+     * Return every declaration whose FQN matches `prefix + pattern` for some prefix in [prefixes].
+     * Deduplicates across prefixes (a declaration reached via several prefixes appears once),
      * preserving the first-encountered order: prefixes in the given order, and within each
      * prefix the declaration order from the source set.
      */
-    fun matchGlob(pattern: String, prefixes: List<String>): List<KtNamedFunction> {
+    fun matchGlob(pattern: String, prefixes: List<String>): List<KtNamedDeclaration> {
         val regexes = prefixes.map { compileGlob(it + pattern) }
-        val seen = mutableSetOf<KtNamedFunction>()
-        val result = mutableListOf<KtNamedFunction>()
+        val seen = mutableSetOf<KtNamedDeclaration>()
+        val result = mutableListOf<KtNamedDeclaration>()
         for (regex in regexes) {
-            for ((fqn, fn) in ordered) {
-                if (regex.matches(fqn) && seen.add(fn)) {
-                    result += fn
+            for ((fqn, decl) in ordered) {
+                if (regex.matches(fqn) && seen.add(decl)) {
+                    result += decl
                 }
             }
         }
@@ -62,25 +78,32 @@ class FqnResolver(session: KorroAnalysisSession) {
             .toList()
     }
 
-    private fun collectFunctions(
+    private fun collectDeclarations(
         file: KtFile,
-        fqn: MutableMap<String, KtNamedFunction>,
-        shortName: MutableMap<String, MutableList<KtNamedFunction>>,
-        ordered: MutableList<Pair<String, KtNamedFunction>>,
+        fqn: MutableMap<String, KtNamedDeclaration>,
+        shortName: MutableMap<String, MutableList<KtNamedDeclaration>>,
+        ordered: MutableList<Pair<String, KtNamedDeclaration>>,
     ) {
-        fun visit(declarations: List<org.jetbrains.kotlin.psi.KtDeclaration>) {
+        fun index(decl: KtNamedDeclaration) {
+            val fqnString = decl.fqName?.asString()
+            if (fqnString != null) {
+                fqn[fqnString] = decl
+                ordered += fqnString to decl
+            }
+            decl.name?.let { shortName.getOrPut(it) { mutableListOf() }.add(decl) }
+        }
+
+        fun visit(declarations: List<KtDeclaration>) {
             declarations.forEach { decl ->
                 when (decl) {
-                    is KtNamedFunction -> {
-                        val fqnString = decl.fqName?.asString()
-                        if (fqnString != null) {
-                            fqn[fqnString] = decl
-                            ordered += fqnString to decl
-                        }
-                        decl.name?.let { shortName.getOrPut(it) { mutableListOf() }.add(decl) }
+                    is KtEnumEntry -> {}
+                    is KtNamedFunction -> index(decl)
+                    is KtProperty -> index(decl)
+                    is KtClassOrObject -> {
+                        index(decl)
+                        visit(decl.declarations)
                     }
 
-                    is KtClassOrObject -> visit(decl.declarations)
                     else -> {}
                 }
             }
