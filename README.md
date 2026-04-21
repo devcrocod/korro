@@ -2,7 +2,7 @@
 
 [![Apache license](https://img.shields.io/badge/license-Apache%20License%202.0-blue.svg?style=flat)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.devcrocod/korro-gradle-plugin?label=Maven%20Central)](https://central.sonatype.com/artifact/io.github.devcrocod/korro-gradle-plugin)
-[![Gradle plugin](https://img.shields.io/maven-metadata/v/https/plugins.gradle.org/m2/io/github/devcrocod/korro/maven-metadata.xml.svg?label=Gradle+plugin)](https://plugins.gradle.org/plugin/io.github.devcrocod.korro)
+[![Gradle plugin](https://img.shields.io/maven-metadata/v/https/plugins.gradle.org/m2/io/github/devcrocod/korro/io.github.devcrocod.korro.gradle.plugin/maven-metadata.xml.svg?label=Gradle+plugin)](https://plugins.gradle.org/plugin/io.github.devcrocod.korro)
 
 Keep your Kotlin documentation snippets compiled, testable, and in sync with real source code.
 
