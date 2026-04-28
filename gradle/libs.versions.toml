@@ -5,7 +5,7 @@ shadow = "9.4.1"
 pluginPublish = "2.1.1"
 kotlinxSerialization = "1.11.0"
 caffeine = "3.2.3"
-junit = "5.14.3"
+junit = "5.14.4"
 mavenPublish = "0.36.0"
 
 [libraries]
