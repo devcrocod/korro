@@ -59,21 +59,30 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
     fun renderFunBody(funName: String): List<String>? {
         val functionNames = imports.map { it + funName }
         return functionNames.firstNotNullOfOrNull { name ->
-            var text = samplesTransformer(name) ?: groups.firstNotNullOfOrNull { group ->
-                group.patterns.mapNotNull { pattern ->
-                    samplesTransformer(name + pattern.nameSuffix)?.let { sampleText ->
-                        group.beforeSample?.let { pattern.processSubstitutions(it) } + sampleText +
-                            group.afterSample?.let { pattern.processSubstitutions(it) }
+            val direct = samplesTransformer(name)
+            var text: String? = direct?.snippet
+            var resolvedFqn: String? = direct?.fqn
+            if (text == null) {
+                val grouped = groups.firstNotNullOfOrNull { group ->
+                    var baseFqn: String? = null
+                    val pieces = group.patterns.mapNotNull { pattern ->
+                        samplesTransformer(name + pattern.nameSuffix)?.let { rs ->
+                            if (baseFqn == null) baseFqn = rs.fqn.removeSuffix(pattern.nameSuffix)
+                            group.beforeSample?.let { pattern.processSubstitutions(it) } + rs.snippet +
+                                group.afterSample?.let { pattern.processSubstitutions(it) }
+                        }
                     }
-                }.takeIf { it.isNotEmpty() }?.joinToString(
-                    separator = "\n",
-                    prefix = group.beforeGroup ?: "",
-                    postfix = group.afterGroup ?: ""
-                )
+                    pieces.takeIf { it.isNotEmpty() }?.joinToString(
+                        separator = "\n",
+                        prefix = group.beforeGroup ?: "",
+                        postfix = group.afterGroup ?: ""
+                    )?.let { it to baseFqn }
+                }
+                text = grouped?.first
+                resolvedFqn = grouped?.second
             }
-            val output = outputsMap[name]
-            if (text != null && output != null) {
-                text += output.readText()
+            if (text != null && resolvedFqn != null) {
+                outputsMap[resolvedFqn]?.let { text += it.readText() }
             }
             text?.split("\n")?.plus(endSample)
         }

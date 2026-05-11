@@ -66,6 +66,16 @@ class KorroIntegrationTest {
     }
 
     @Test
+    fun samplesOutputsFixture(@TempDir tempDir: Path) {
+        runFixture(
+            name = "samplesOutputs",
+            tempDir = tempDir,
+            generatedRelativePath = "build/korro/docs/readme.md",
+            expectedRelativePath = "samplesOutputs/docs/expected/readme.md",
+        )
+    }
+
+    @Test
     fun unknownDirectivesPassThrough(@TempDir tempDir: Path) {
         runFixture(
             name = "unknownDirectives",
