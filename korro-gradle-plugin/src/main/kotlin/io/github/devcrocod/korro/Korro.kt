@@ -7,6 +7,15 @@ const val FUN_DIRECTIVE = "FUN"
 const val FUNS_DIRECTIVE = "FUNS"
 const val END_DIRECTIVE = "END"
 
+private val KORRO_DIRECTIVE_NAMES = setOf(
+    IMPORT_DIRECTIVE,
+    FUN_DIRECTIVE,
+    FUNS_DIRECTIVE,
+    END_DIRECTIVE,
+)
+
+private val DIRECTIVE_INNER_REGEX = Regex("([_a-zA-Z.]+)(?:\\s+(.*))?")
+
 /**
  * Marker syntax used to wrap a Korro directive on a single line.
  *
@@ -22,12 +31,6 @@ enum class DirectiveSyntax(val start: String, val end: String) {
     ;
 
     val endSample: String get() = "$start$END_DIRECTIVE$end"
-
-    val regex: Regex = run {
-        val s = Regex.escape(start)
-        val e = Regex.escape(end)
-        Regex("$s\\s*([_a-zA-Z.]+)(?:\\s+(.+?(?=$e|)))?(?:\\s*($e))?\\s*")
-    }
 
     companion object {
         fun forFile(file: File): DirectiveSyntax = when (file.extension.lowercase()) {
@@ -228,10 +231,6 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
                         }
                     }
                 }
-
-                else -> logger.warn(
-                    "Unrecognized directive '${directive.name}' on a line starting with '${syntax.start}' in '$inputFile'"
-                )
             }
         }
     }
@@ -248,11 +247,16 @@ data class Directive(
     val value: String,
 )
 
+// Returns null for anything but a same-line, known-name directive — `<!---TODO-->`,
+// `<!---TOC -->`, three-dash HTML comments, or unclosed openers all pass through as text.
 fun parseDirective(line: String, syntax: DirectiveSyntax = DirectiveSyntax.HTML): Directive? {
     val trimLine = line.trim()
-    if (!trimLine.startsWith(syntax.start)) return null
-    val match = syntax.regex.matchEntire(trimLine) ?: return null
-    val groups = match.groups.filterNotNull().toMutableList()
-    require(groups.last().value == syntax.end) { "Directive must end on the same line with '${syntax.end}'" }
-    return Directive(groups[1].value.trim(), groups.getOrNull(2)?.value?.trim() ?: "")
+    if (!trimLine.startsWith(syntax.start) || !trimLine.endsWith(syntax.end)) return null
+    val inner = trimLine
+        .substring(syntax.start.length, trimLine.length - syntax.end.length)
+        .trim()
+    val match = DIRECTIVE_INNER_REGEX.matchEntire(inner) ?: return null
+    val name = match.groupValues[1]
+    if (name !in KORRO_DIRECTIVE_NAMES) return null
+    return Directive(name, match.groupValues[2].trim())
 }

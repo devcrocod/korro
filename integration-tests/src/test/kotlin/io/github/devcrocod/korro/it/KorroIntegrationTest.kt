@@ -66,6 +66,16 @@ class KorroIntegrationTest {
     }
 
     @Test
+    fun unknownDirectivesPassThrough(@TempDir tempDir: Path) {
+        runFixture(
+            name = "unknownDirectives",
+            tempDir = tempDir,
+            generatedRelativePath = "build/korro/docs/readme.md",
+            expectedRelativePath = "unknownDirectives/docs/expected/readme.md",
+        )
+    }
+
+    @Test
     fun strictModeFailsOnMissing(@TempDir tempDir: Path) {
         val fixture = loadFixture("strictErrors", tempDir)
 
