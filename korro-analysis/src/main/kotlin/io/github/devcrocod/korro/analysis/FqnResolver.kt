@@ -33,15 +33,14 @@ class FqnResolver(session: KorroAnalysisSession) {
     }
 
     /**
-     * FQNs of every declaration sharing [bareName] when the short name is ambiguous,
-     * or `null` when the name is unambiguous, qualified (contains a dot), or unknown.
-     * Used by callers to distinguish "not found" from "multiple matches" in diagnostics.
+     * Every FQN whose declaration shares [bareName] as its short name, in encounter order.
+     * Empty for qualified names (containing `.`) or when the short name is unknown.
+     * Callers use this to distinguish "not found", "ambiguous", and "found-but-out-of-import-scope"
+     * in diagnostics.
      */
-    fun ambiguous(bareName: String): List<String>? {
-        if ('.' in bareName) return null
-        val candidates = byShortName[bareName] ?: return null
-        if (candidates.size < 2) return null
-        return candidates.mapNotNull { it.fqName?.asString() }
+    fun matchesByShortName(bareName: String): List<String> {
+        if ('.' in bareName) return emptyList()
+        return byShortName[bareName].orEmpty().mapNotNull { it.fqName?.asString() }
     }
 
     /**

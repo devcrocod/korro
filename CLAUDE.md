@@ -43,7 +43,7 @@ Analysis code is pulled in at task-execution time: `KorroPlugin` creates a detac
 Runs inside the worker's isolated classloader. Bundles the Kotlin Analysis API (K2 standalone), low-level FIR, and the IntelliJ platform. `com.intellij.*` and `org.jetbrains.kotlin.*` are **intentionally unrelocated** — the Analysis API is already uniquely namespaced, and relocating it breaks reflection lookups inside the platform.
 
 - One `StandaloneAnalysisAPISession` per `KorroWorkAction.execute()` call, disposed in a `try/finally`. Do **not** call `disposeGlobalStandaloneApplicationServices()` — it's a one-shot that invalidates all future Analysis API use in the JVM. `classLoaderIsolation` gives a fresh classloader per task run, so singletons are reloaded naturally.
-- FQN resolution is two-tier: a fast-path short-name index over `KtNamedFunction`s for unambiguous bare names, then a dummy-KDoc `/** [fqn] */` fallback for qualified/ambiguous names. First-import-wins on ambiguity.
+- FQN resolution is two-tier: `byFqn` (exact full-FQN map) is the primary path, used for every `IMPORT`-qualified candidate and for any `FUN`/`FUNS` value that already contains a `.`. `byShortName.singleOrNull()` is the bare-name fallback and fires only when no `IMPORT` directives are in effect — IMPORT is authoritative when present, so a bare `FUN` under `IMPORT` will *not* slide over to a same-named declaration in an unrelated package.
 
 ### Worker boundary
 
@@ -62,6 +62,6 @@ These are contracts for every consumer's docs; breaking any of them silently bre
 - **Directives start at column 0 after `String.trim()`.** `parseDirective` returns `null` otherwise.
 - **Three dashes to open, two to close.** `<!---NAME VALUE-->` for `.md` (and anything non-`.mdx`); `{/*---NAME VALUE--*/}` for `.mdx`. Do not collapse the open marker to two dashes — that becomes a standard HTML/MDX comment, and consumer docs rely on the distinction.
 - **Directive name regex is `[_a-zA-Z.]+`.** Broadening it changes parsing for every consumer.
-- **First `IMPORT` wins** on ambiguous short names (`firstNotNullOfOrNull` over the `imports` list).
+- **First `IMPORT` wins** when several IMPORT prefixes resolve the same short name (`firstNotNullOfOrNull` over the `imports` list). The `imports` list holds *only* explicit IMPORT prefixes — do not re-introduce an implicit empty seed, since that lets the resolver's bare-name uniqueness fallback hijack IMPORT-scoped lookups.
 - **`KtNamedFunction`, `KtClassOrObject`, and `KtProperty`** are valid `FUN`/`FUNS` targets. Enum entries, type aliases, local declarations, and `.kts` scripts are not; resolving to a non-target produces a diagnostic, not a silent empty snippet. Class/object/property targets rely on `//SampleStart` / `//SampleEnd` markers inside their body for non-empty output.
 - **`behavior.ignoreMissing=false` is the strict-by-default contract.** Don't silently lower severity on unresolved references without an explicit opt-in.

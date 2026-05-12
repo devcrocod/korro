@@ -7,6 +7,15 @@ const val FUN_DIRECTIVE = "FUN"
 const val FUNS_DIRECTIVE = "FUNS"
 const val END_DIRECTIVE = "END"
 
+private val KORRO_DIRECTIVE_NAMES = setOf(
+    IMPORT_DIRECTIVE,
+    FUN_DIRECTIVE,
+    FUNS_DIRECTIVE,
+    END_DIRECTIVE,
+)
+
+private val DIRECTIVE_INNER_REGEX = Regex("([_a-zA-Z.]+)(?:\\s+(.*))?")
+
 /**
  * Marker syntax used to wrap a Korro directive on a single line.
  *
@@ -23,12 +32,6 @@ enum class DirectiveSyntax(val start: String, val end: String) {
 
     val endSample: String get() = "$start$END_DIRECTIVE$end"
 
-    val regex: Regex = run {
-        val s = Regex.escape(start)
-        val e = Regex.escape(end)
-        Regex("$s\\s*([_a-zA-Z.]+)(?:\\s+(.+?(?=$e|)))?(?:\\s*($e))?\\s*")
-    }
-
     companion object {
         fun forFile(file: File): DirectiveSyntax = when (file.extension.lowercase()) {
             "mdx" -> MDX
@@ -43,7 +46,8 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
     val endSample = syntax.endSample
     val samplesTransformer = this.samplesTransformer
     val lines = ArrayList<String>()
-    val imports = mutableListOf("")
+    // No empty-prefix seed — see renderFunBody for why.
+    val imports = mutableListOf<String>()
 
     fun reportMissing(line: Int, message: String, hint: String? = null) {
         val sev = if (ignoreMissing) Severity.WARN else Severity.ERROR
@@ -54,23 +58,38 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
     }
 
     fun renderFunBody(funName: String): List<String>? {
-        val functionNames = imports.map { it + funName }
+        // A bare FUN under IMPORT(s) must be tried *only* against IMPORT-qualified candidates.
+        // Adding an implicit empty prefix would let the resolver's byShortName uniqueness fallback
+        // pick a same-named function from an unrelated package, silently ignoring IMPORT.
+        val functionNames = when {
+            '.' in funName || imports.isEmpty() -> listOf(funName)
+            else -> imports.map { it + funName }
+        }
         return functionNames.firstNotNullOfOrNull { name ->
-            var text = samplesTransformer(name) ?: groups.firstNotNullOfOrNull { group ->
-                group.patterns.mapNotNull { pattern ->
-                    samplesTransformer(name + pattern.nameSuffix)?.let { sampleText ->
-                        group.beforeSample?.let { pattern.processSubstitutions(it) } + sampleText +
-                            group.afterSample?.let { pattern.processSubstitutions(it) }
+            val direct = samplesTransformer(name)
+            var text: String? = direct?.snippet
+            var resolvedFqn: String? = direct?.fqn
+            if (text == null) {
+                val grouped = groups.firstNotNullOfOrNull { group ->
+                    var baseFqn: String? = null
+                    val pieces = group.patterns.mapNotNull { pattern ->
+                        samplesTransformer(name + pattern.nameSuffix)?.let { rs ->
+                            if (baseFqn == null) baseFqn = rs.fqn.removeSuffix(pattern.nameSuffix)
+                            group.beforeSample?.let { pattern.processSubstitutions(it) } + rs.snippet +
+                                group.afterSample?.let { pattern.processSubstitutions(it) }
+                        }
                     }
-                }.takeIf { it.isNotEmpty() }?.joinToString(
-                    separator = "\n",
-                    prefix = group.beforeGroup ?: "",
-                    postfix = group.afterGroup ?: ""
-                )
+                    pieces.takeIf { it.isNotEmpty() }?.joinToString(
+                        separator = "\n",
+                        prefix = group.beforeGroup ?: "",
+                        postfix = group.afterGroup ?: ""
+                    )?.let { it to baseFqn }
+                }
+                text = grouped?.first
+                resolvedFqn = grouped?.second
             }
-            val output = outputsMap[name]
-            if (text != null && output != null) {
-                text += output.readText()
+            if (text != null && resolvedFqn != null) {
+                outputsMap[resolvedFqn]?.let { text += it.readText() }
             }
             text?.split("\n")?.plus(endSample)
         }
@@ -79,14 +98,19 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
     fun processFun(funName: String, oldSampleLines: List<String>, directiveLine: Int) {
         val newSamplesLines = renderFunBody(funName)
         if (newSamplesLines == null) {
-            val ambiguous = samplesTransformer.ambiguous(funName)
-            val (message, hint) = if (ambiguous != null) {
-                "Ambiguous FUN '$funName'" to
-                    "candidates: ${ambiguous.joinToString(", ")}; qualify with IMPORT"
-            } else {
-                val suggestions = samplesTransformer.suggestions(funName).takeIf { it.isNotEmpty() }
-                    ?.joinToString(prefix = "did you mean: ", separator = ", ")
-                "Cannot resolve FUN '$funName'" to suggestions
+            val shortNameMatches = samplesTransformer.matchesByShortName(funName)
+            val (message, hint) = when {
+                imports.isEmpty() && shortNameMatches.size >= 2 ->
+                    "Ambiguous FUN '$funName'" to
+                        "candidates: ${shortNameMatches.joinToString(", ")}; qualify with IMPORT"
+                imports.isNotEmpty() && shortNameMatches.isNotEmpty() ->
+                    "Cannot resolve FUN '$funName' under current IMPORT(s)" to
+                        "found at: ${shortNameMatches.joinToString(", ")} — add an IMPORT or qualify the FUN"
+                else -> {
+                    val suggestions = samplesTransformer.suggestions(funName).takeIf { it.isNotEmpty() }
+                        ?.joinToString(prefix = "did you mean: ", separator = ", ")
+                    "Cannot resolve FUN '$funName'" to suggestions
+                }
             }
             reportMissing(directiveLine, message, hint)
             lines.addAll(oldSampleLines)
@@ -101,7 +125,12 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
     }
 
     fun renderFunsBody(glob: String): List<String>? {
-        val matches = samplesTransformer.matchGlob(glob, imports)
+        // Same scoping rule as renderFunBody — IMPORT, when present, is authoritative.
+        val prefixes = when {
+            '.' in glob || imports.isEmpty() -> listOf("")
+            else -> imports
+        }
+        val matches = samplesTransformer.matchGlob(glob, prefixes)
         if (matches.isEmpty()) return null
 
         val trimmed = matches.map { it.copy(snippet = it.snippet.trim { ch -> ch == '\n' }) }
@@ -228,10 +257,6 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
                         }
                     }
                 }
-
-                else -> logger.warn(
-                    "Unrecognized directive '${directive.name}' on a line starting with '${syntax.start}' in '$inputFile'"
-                )
             }
         }
     }
@@ -248,11 +273,16 @@ data class Directive(
     val value: String,
 )
 
+// Returns null for anything but a same-line, known-name directive — `<!---TODO-->`,
+// `<!---TOC -->`, three-dash HTML comments, or unclosed openers all pass through as text.
 fun parseDirective(line: String, syntax: DirectiveSyntax = DirectiveSyntax.HTML): Directive? {
     val trimLine = line.trim()
-    if (!trimLine.startsWith(syntax.start)) return null
-    val match = syntax.regex.matchEntire(trimLine) ?: return null
-    val groups = match.groups.filterNotNull().toMutableList()
-    require(groups.last().value == syntax.end) { "Directive must end on the same line with '${syntax.end}'" }
-    return Directive(groups[1].value.trim(), groups.getOrNull(2)?.value?.trim() ?: "")
+    if (!trimLine.startsWith(syntax.start) || !trimLine.endsWith(syntax.end)) return null
+    val inner = trimLine
+        .substring(syntax.start.length, trimLine.length - syntax.end.length)
+        .trim()
+    val match = DIRECTIVE_INNER_REGEX.matchEntire(inner) ?: return null
+    val name = match.groupValues[1]
+    if (name !in KORRO_DIRECTIVE_NAMES) return null
+    return Directive(name, match.groupValues[2].trim())
 }

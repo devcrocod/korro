@@ -66,6 +66,26 @@ class KorroIntegrationTest {
     }
 
     @Test
+    fun samplesOutputsFixture(@TempDir tempDir: Path) {
+        runFixture(
+            name = "samplesOutputs",
+            tempDir = tempDir,
+            generatedRelativePath = "build/korro/docs/readme.md",
+            expectedRelativePath = "samplesOutputs/docs/expected/readme.md",
+        )
+    }
+
+    @Test
+    fun unknownDirectivesPassThrough(@TempDir tempDir: Path) {
+        runFixture(
+            name = "unknownDirectives",
+            tempDir = tempDir,
+            generatedRelativePath = "build/korro/docs/readme.md",
+            expectedRelativePath = "unknownDirectives/docs/expected/readme.md",
+        )
+    }
+
+    @Test
     fun strictModeFailsOnMissing(@TempDir tempDir: Path) {
         val fixture = loadFixture("strictErrors", tempDir)
 
@@ -92,6 +112,39 @@ class KorroIntegrationTest {
         }
         assertTrue(output.contains("error(s) found")) {
             "Expected failure output to contain formatted diagnostic table header; got:\n$output"
+        }
+    }
+
+    @Test
+    fun strictModeFailsWhenFunIsOutOfImportScope(@TempDir tempDir: Path) {
+        val fixture = loadFixture("importScoping", tempDir)
+
+        val runner = GradleRunner.create()
+            .withProjectDir(fixture.toFile())
+            .withArguments("korro", "--stacktrace")
+            .forwardOutput()
+
+        configurePluginClasspath(runner)
+        System.getProperty("korro.testkit.gradleVersion")
+            ?.takeIf { it.isNotBlank() }
+            ?.let(runner::withGradleVersion)
+
+        val result = runner.buildAndFail()
+
+        assertEquals(
+            TaskOutcome.FAILED,
+            result.task(":korroGenerate")?.outcome,
+            "korroGenerate task should fail when the FUN target lives outside every IMPORT prefix",
+        )
+        val output = result.output
+        assertTrue(output.contains("sharedName")) {
+            "Expected failure output to name the unresolved directive 'sharedName'; got:\n$output"
+        }
+        assertTrue(output.contains("samples.api.Access.sharedName")) {
+            "Expected diagnostic to point at the real FQN samples.api.Access.sharedName; got:\n$output"
+        }
+        assertTrue(output.contains("under current IMPORT")) {
+            "Expected diagnostic to flag the IMPORT scope mismatch; got:\n$output"
         }
     }
 
