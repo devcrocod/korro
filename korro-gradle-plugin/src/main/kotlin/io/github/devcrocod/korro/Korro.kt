@@ -46,7 +46,8 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
     val endSample = syntax.endSample
     val samplesTransformer = this.samplesTransformer
     val lines = ArrayList<String>()
-    val imports = mutableListOf("")
+    // No empty-prefix seed — see renderFunBody for why.
+    val imports = mutableListOf<String>()
 
     fun reportMissing(line: Int, message: String, hint: String? = null) {
         val sev = if (ignoreMissing) Severity.WARN else Severity.ERROR
@@ -57,7 +58,13 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
     }
 
     fun renderFunBody(funName: String): List<String>? {
-        val functionNames = imports.map { it + funName }
+        // A bare FUN under IMPORT(s) must be tried *only* against IMPORT-qualified candidates.
+        // Adding an implicit empty prefix would let the resolver's byShortName uniqueness fallback
+        // pick a same-named function from an unrelated package, silently ignoring IMPORT.
+        val functionNames = when {
+            '.' in funName || imports.isEmpty() -> listOf(funName)
+            else -> imports.map { it + funName }
+        }
         return functionNames.firstNotNullOfOrNull { name ->
             val direct = samplesTransformer(name)
             var text: String? = direct?.snippet
@@ -91,14 +98,19 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
     fun processFun(funName: String, oldSampleLines: List<String>, directiveLine: Int) {
         val newSamplesLines = renderFunBody(funName)
         if (newSamplesLines == null) {
-            val ambiguous = samplesTransformer.ambiguous(funName)
-            val (message, hint) = if (ambiguous != null) {
-                "Ambiguous FUN '$funName'" to
-                    "candidates: ${ambiguous.joinToString(", ")}; qualify with IMPORT"
-            } else {
-                val suggestions = samplesTransformer.suggestions(funName).takeIf { it.isNotEmpty() }
-                    ?.joinToString(prefix = "did you mean: ", separator = ", ")
-                "Cannot resolve FUN '$funName'" to suggestions
+            val shortNameMatches = samplesTransformer.matchesByShortName(funName)
+            val (message, hint) = when {
+                imports.isEmpty() && shortNameMatches.size >= 2 ->
+                    "Ambiguous FUN '$funName'" to
+                        "candidates: ${shortNameMatches.joinToString(", ")}; qualify with IMPORT"
+                imports.isNotEmpty() && shortNameMatches.isNotEmpty() ->
+                    "Cannot resolve FUN '$funName' under current IMPORT(s)" to
+                        "found at: ${shortNameMatches.joinToString(", ")} — add an IMPORT or qualify the FUN"
+                else -> {
+                    val suggestions = samplesTransformer.suggestions(funName).takeIf { it.isNotEmpty() }
+                        ?.joinToString(prefix = "did you mean: ", separator = ", ")
+                    "Cannot resolve FUN '$funName'" to suggestions
+                }
             }
             reportMissing(directiveLine, message, hint)
             lines.addAll(oldSampleLines)
@@ -113,7 +125,12 @@ fun KorroContext.korro(inputFile: File, outputFile: File): Boolean {
     }
 
     fun renderFunsBody(glob: String): List<String>? {
-        val matches = samplesTransformer.matchGlob(glob, imports)
+        // Same scoping rule as renderFunBody — IMPORT, when present, is authoritative.
+        val prefixes = when {
+            '.' in glob || imports.isEmpty() -> listOf("")
+            else -> imports
+        }
+        val matches = samplesTransformer.matchGlob(glob, prefixes)
         if (matches.isEmpty()) return null
 
         val trimmed = matches.map { it.copy(snippet = it.snippet.trim { ch -> ch == '\n' }) }

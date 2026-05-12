@@ -28,7 +28,7 @@ class SamplesTransformer(
 
     fun suggestions(bareName: String): List<String> = resolver.suggestShortNames(bareName)
 
-    fun ambiguous(bareName: String): List<String>? = resolver.ambiguous(bareName)
+    fun matchesByShortName(bareName: String): List<String> = resolver.matchesByShortName(bareName)
 
     override fun close() {
         session.close()
