@@ -34,7 +34,7 @@ the same code your CI builds and tests.
 
 ```kotlin
 plugins {
-    id("io.github.devcrocod.korro") version "0.2.1"
+    id("io.github.devcrocod.korro") version "0.2.2"
 }
 ```
 
@@ -234,7 +234,7 @@ rootProject.name = "korro-example"
 
 ```kotlin
 plugins {
-    id("io.github.devcrocod.korro") version "0.2.1"
+    id("io.github.devcrocod.korro") version "0.2.2"
 }
 
 repositories {
