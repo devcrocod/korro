@@ -1,12 +1,12 @@
 [versions]
 kotlin = "2.4.10"
 kotlinLanguage = "2.1"
-shadow = "9.4.2"
+shadow = "9.6.0"
 pluginPublish = "2.1.1"
 kotlinxSerialization = "1.11.0"
 caffeine = "3.2.4"
 junit = "5.14.4"
-mavenPublish = "0.36.0"
+mavenPublish = "0.37.0"
 
 [libraries]
 kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
