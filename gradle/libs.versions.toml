@@ -1,5 +1,5 @@
 [versions]
-kotlin = "2.3.21"
+kotlin = "2.4.10"
 kotlinLanguage = "2.1"
 shadow = "9.4.2"
 pluginPublish = "2.1.1"
