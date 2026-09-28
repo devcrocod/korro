@@ -36,6 +36,10 @@
       "groupName": "github actions"
     },
     {
+      "matchDepNames": ["java-jdk"],
+      "enabled": false
+    },
+    {
       "matchManagers": ["gradle-wrapper"],
       "groupName": "gradle"
     }
