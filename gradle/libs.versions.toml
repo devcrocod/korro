@@ -1,5 +1,8 @@
 [versions]
-kotlin = "2.4.10"
+kotlin = "2.4.21"
+# Bundled Analysis API + the kotlin-compiler jar it runs on. Held at 2.4.10 until 2.5.0: from 2.4.20 kotlin-compiler lacks
+# the decompiler and IntelliJ classes a standalone session needs (NoClassDefFoundError: ClsKotlinBinaryClassCache).
+analysisApi = "2.4.10"
 kotlinLanguage = "2.1"
 shadow = "9.6.1"
 pluginPublish = "2.1.1"
@@ -10,15 +13,15 @@ mavenPublish = "0.37.0"
 
 [libraries]
 kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
-kotlin-compiler = { module = "org.jetbrains.kotlin:kotlin-compiler", version.ref = "kotlin" }
+kotlin-compiler = { module = "org.jetbrains.kotlin:kotlin-compiler", version.ref = "analysisApi" }
 
-kotlin-analysisApi = { module = "org.jetbrains.kotlin:analysis-api-for-ide", version.ref = "kotlin" }
-kotlin-analysisApi-implBase = { module = "org.jetbrains.kotlin:analysis-api-impl-base-for-ide", version.ref = "kotlin" }
-kotlin-analysisApi-platformInterface = { module = "org.jetbrains.kotlin:analysis-api-platform-interface-for-ide", version.ref = "kotlin" }
-kotlin-analysisApi-standalone = { module = "org.jetbrains.kotlin:analysis-api-standalone-for-ide", version.ref = "kotlin" }
-kotlin-analysisApi-k2 = { module = "org.jetbrains.kotlin:analysis-api-k2-for-ide", version.ref = "kotlin" }
-kotlin-lowLevelApiFir = { module = "org.jetbrains.kotlin:low-level-api-fir-for-ide", version.ref = "kotlin" }
-kotlin-symbolLightClasses = { module = "org.jetbrains.kotlin:symbol-light-classes-for-ide", version.ref = "kotlin" }
+kotlin-analysisApi = { module = "org.jetbrains.kotlin:analysis-api-for-ide", version.ref = "analysisApi" }
+kotlin-analysisApi-implBase = { module = "org.jetbrains.kotlin:analysis-api-impl-base-for-ide", version.ref = "analysisApi" }
+kotlin-analysisApi-platformInterface = { module = "org.jetbrains.kotlin:analysis-api-platform-interface-for-ide", version.ref = "analysisApi" }
+kotlin-analysisApi-standalone = { module = "org.jetbrains.kotlin:analysis-api-standalone-for-ide", version.ref = "analysisApi" }
+kotlin-analysisApi-k2 = { module = "org.jetbrains.kotlin:analysis-api-k2-for-ide", version.ref = "analysisApi" }
+kotlin-lowLevelApiFir = { module = "org.jetbrains.kotlin:low-level-api-fir-for-ide", version.ref = "analysisApi" }
+kotlin-symbolLightClasses = { module = "org.jetbrains.kotlin:symbol-light-classes-for-ide", version.ref = "analysisApi" }
 
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinxSerialization" }
 caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "caffeine" }
