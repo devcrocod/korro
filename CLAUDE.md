@@ -53,7 +53,7 @@ Runs inside the worker's isolated classloader. Bundles the Kotlin Analysis API (
 
 - Korro's own version lives in `gradle.properties` (`version=...`). Both subprojects inherit it via `subprojects { version = rootProject.version }` in the root `build.gradle.kts`. At runtime the plugin reads it from a generated `META-INF/korro-gradle-plugin.properties` resource (`KorroPlugin.readKorroPluginVersion`).
 - Every other version lives in `gradle/libs.versions.toml`. The catalog is the single source of truth — do not hard-code versions in subproject scripts; add to the catalog and reference as `libs.*` / `libs.plugins.*`.
-- `libs.versions.kotlin` — pinned Kotlin / Analysis API version. `libs.versions.kotlinLanguage` — Kotlin `languageVersion`/`apiVersion` used to compile Korro itself; unrelated to the bundled Analysis API. JVM target is hard-coded to `17` in the root `build.gradle.kts`.
+- `libs.versions.kotlin` — Kotlin Gradle plugin and stdlib used to build Korro. `libs.versions.analysisApi` — the bundled Analysis API (`*-for-ide` artifacts) together with the `kotlin-compiler` jar it runs on; they always move as one and may lag `kotlin` (the catalog comment says why). `libs.versions.kotlinLanguage` — Kotlin `languageVersion`/`apiVersion` used to compile Korro itself; unrelated to the bundled Analysis API. JVM target is hard-coded to `17` in the root `build.gradle.kts`.
 
 ## Invariants to preserve
 

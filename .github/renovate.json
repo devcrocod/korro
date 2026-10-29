@@ -24,6 +24,20 @@
       "allowedVersions": "/^\\d+\\.\\d+\\.\\d+$/"
     },
     {
+      "description": "Hold the bundled Analysis API at 2.4.10 until 2.5.0: from 2.4.20 kotlin-compiler can no longer host a standalone session (see libs.versions.toml)",
+      "matchPackageNames": [
+        "org.jetbrains.kotlin:kotlin-compiler",
+        "org.jetbrains.kotlin:analysis-api-for-ide",
+        "org.jetbrains.kotlin:analysis-api-impl-base-for-ide",
+        "org.jetbrains.kotlin:analysis-api-platform-interface-for-ide",
+        "org.jetbrains.kotlin:analysis-api-standalone-for-ide",
+        "org.jetbrains.kotlin:analysis-api-k2-for-ide",
+        "org.jetbrains.kotlin:low-level-api-fir-for-ide",
+        "org.jetbrains.kotlin:symbol-light-classes-for-ide"
+      ],
+      "allowedVersions": "/^(2\\.4\\.10|2\\.([5-9]|[1-9]\\d)\\.\\d+|[3-9]\\.\\d+\\.\\d+)$/"
+    },
+    {
       "matchPackageNames": [
         "org.junit:junit-bom",
         "org.junit.jupiter:junit-jupiter",
